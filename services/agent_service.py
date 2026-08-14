@@ -99,26 +99,20 @@ def evaluar_upgrade_movistar_total(client_id: str) -> Dict[str, Any]:
 
 def process_user_message(client_id: str, user_query: str, chat_history: Optional[List[Dict[str, Any]]] = None) -> str:
     """
-    Procesa el mensaje del usuario con evaluación previa de escalamiento (automático o explícito),
-    ejecución de herramientas deterministas y 0% de alucinación.
+    Procesa el mensaje del usuario utilizando el cliente de Gemini y el System Prompt de Yara AI.
     """
-    q = user_query.strip().lower()
-    cid = str(client_id).strip().upper()
-    history = chat_history or []
-
-    # 1. Evaluación de Escalamiento a Humano (Explícito o Automático)
-    debe_escalar, tipo_disparador, motivo = detectar_necesidad_escalamiento(user_query, history, cid)
+    from services.gemini_service import get_gemini_response
     
-    if debe_escalar:
-        ticket = escalar_a_humano(cid, history, motivo, prioridad="ALTA" if "GRAVE" in tipo_disparador else "MEDIA")
-        t_id = ticket["ticket_id"]
-        return (
-            f"🔔 **He transferido tu caso a uno de nuestros asesores especializados.** En breve te atenderán con todo el detalle de tu consulta.\n\n"
-            f"• **Ticket de Atención Asignado:** **`{t_id}`**\n"
-            f"• **Motivo Registrado:** *{motivo}*\n"
-            f"• **Estado:** `PENDIENTE EN COLA PRIORITARIA`\n\n"
-            f"El asesor asignado revisará la conversación anterior y el detalle de tu línea para darte una solución inmediata."
-        )
+    cid = str(client_id).strip().upper()
+    client_ctx = CLIENTES_CATALOGO.get(cid, {"id": cid, "nombre": f"Cliente {cid}", "servicio": "Servicio Fijo/Móvil"})
+    
+    res = get_gemini_response(
+        chat_history=chat_history or [],
+        user_message=user_query,
+        client_context=client_ctx
+    )
+    return res["response_text"]
+
 
     # 2. Intención: Consultar por qué subió el recibo / desglose de cobro
     if any(k in q for k in ["por qué", "porque", "por que", "subió", "subio", "aumentó", "aumento", "cobro", "recibo", "variación", "variacion", "monto", "factura", "más caro", "mas caro", "diferencia"]):
