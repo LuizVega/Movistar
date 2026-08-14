@@ -1,6 +1,7 @@
 """
 services/agent_service.py - Motor Agéntico de Atención y Facturación Movistar
 Implementa Tool Calling / Function Calling determinista basado estrictamente en los datasets y BD local.
+Integra escalamiento automático y explícito con services/escalation_service.py.
 Política Anti-Alucinación: 0% datos inventados. Si no existe el dato, responde explícitamente:
 'No dispongo de ese dato en su facturación actual'.
 """
@@ -12,7 +13,18 @@ from typing import Dict, Any, List, Optional
 from diff_engine import auditar_variacion_recibo
 from nbo_engine import generar_next_best_offer
 from database import get_connection, get_cliente_by_id
-from state_manager import escalate_case_to_human, CLIENTES_CATALOGO
+from state_manager import CLIENTES_CATALOGO
+from services.escalation_service import (
+    detectar_necesidad_escalamiento,
+    escalar_a_humano,
+    cliente_tiene_ticket_pendiente
+)
+
+# Alias para compatibilidad
+def solicitar_derivacion_humana(client_id: str, motivo: str) -> str:
+    ticket = escalar_a_humano(client_id, [], motivo)
+    return ticket["ticket_id"]
+
 
 
 # =========================================================
@@ -27,10 +39,9 @@ def consultar_recibo(client_id: str, periodo: str = "2026-07") -> Dict[str, Any]
     cid = str(client_id).strip().upper()
     diff_data = auditar_variacion_recibo(cid, periodo)
     
-    # Búsqueda adicional en CSVs de soporte si existen
     detalles_soporte = []
     
-    # 1. Prorrateos
+    # Prorrateos
     prorrateo_csv = "BRAINY_PRORRATEO_ALTASV3.csv"
     if os.path.exists(prorrateo_csv):
         try:
@@ -47,7 +58,7 @@ def consultar_recibo(client_id: str, periodo: str = "2026-07") -> Dict[str, Any]
         except Exception:
             pass
 
-    # 2. Descuentos y Cuotas
+    # Descuentos y Cuotas
     descuentos_csv = "BRAINY_DESCUENTOS_CUOTAS.csv"
     if os.path.exists(descuentos_csv):
         try:
@@ -82,38 +93,34 @@ def evaluar_upgrade_movistar_total(client_id: str) -> Dict[str, Any]:
     return generar_next_best_offer(client_id)
 
 
-def solicitar_derivacion_humana(client_id: str, motivo: str) -> str:
-    """
-    Herramienta C: Transfiere el caso a la cola de derivación humana en el CRM.
-    """
-    nombre = CLIENTES_CATALOGO.get(client_id, {}).get("nombre", f"Cliente {client_id}")
-    ticket_id = escalate_case_to_human(client_id, nombre, motivo)
-    return ticket_id
-
-
 # =========================================================
 # 2. MOTOR AGÉNTICO Y LÓGICA DE RESPUESTA CONVERSACIONAL
 # =========================================================
 
-def process_user_message(client_id: str, user_query: str) -> str:
+def process_user_message(client_id: str, user_query: str, chat_history: Optional[List[Dict[str, Any]]] = None) -> str:
     """
-    Procesa el mensaje del usuario, ejecuta Tool Calling según la intención detectada
-    y formula una respuesta en lenguaje sencillo basada 100% en los datos reales (0% alucinación).
+    Procesa el mensaje del usuario con evaluación previa de escalamiento (automático o explícito),
+    ejecución de herramientas deterministas y 0% de alucinación.
     """
     q = user_query.strip().lower()
     cid = str(client_id).strip().upper()
+    history = chat_history or []
 
-    # Intención 1: Solicitud de hablar con un humano / queja compleja
-    if any(k in q for k in ["humano", "asesor", "persona", "operador", "ejecutivo", "transferir", "escalar", "supervisor", "reclamo formal", "libro de reclamaciones"]):
-        motivo = f"Solicitud de atención con asesor humano para consulta: '{user_query}'"
-        t_id = solicitar_derivacion_humana(cid, motivo)
+    # 1. Evaluación de Escalamiento a Humano (Explícito o Automático)
+    debe_escalar, tipo_disparador, motivo = detectar_necesidad_escalamiento(user_query, history, cid)
+    
+    if debe_escalar:
+        ticket = escalar_a_humano(cid, history, motivo, prioridad="ALTA" if "GRAVE" in tipo_disparador else "MEDIA")
+        t_id = ticket["ticket_id"]
         return (
-            f"🔔 **He transferido tu caso a un asesor humano de inmediato.**\n\n"
-            f"Se ha generado el ticket de atención prioritaria **`{t_id}`**.\n"
-            f"Un asesor especializado revisará tu historial de facturación y se comunicará contigo a la brevedad."
+            f"🔔 **He transferido tu caso a uno de nuestros asesores especializados.** En breve te atenderán con todo el detalle de tu consulta.\n\n"
+            f"• **Ticket de Atención Asignado:** **`{t_id}`**\n"
+            f"• **Motivo Registrado:** *{motivo}*\n"
+            f"• **Estado:** `PENDIENTE EN COLA PRIORITARIA`\n\n"
+            f"El asesor asignado revisará la conversación anterior y el detalle de tu línea para darte una solución inmediata."
         )
 
-    # Intención 2: Consultar por qué subió el recibo / desglose de cobro
+    # 2. Intención: Consultar por qué subió el recibo / desglose de cobro
     if any(k in q for k in ["por qué", "porque", "por que", "subió", "subio", "aumentó", "aumento", "cobro", "recibo", "variación", "variacion", "monto", "factura", "más caro", "mas caro", "diferencia"]):
         recibo_info = consultar_recibo(cid)
         
@@ -159,7 +166,7 @@ def process_user_message(client_id: str, user_query: str) -> str:
             f"💡 *Recuerda que si necesitas facilidades, puedes solicitar un fraccionamiento sin intereses o consultar una mejora a Movistar Total.*"
         )
 
-    # Intención 3: Consultar / solicitar Upgrade a Movistar Total
+    # 3. Intención: Consultar / solicitar Upgrade a Movistar Total
     if any(k in q for k in ["upgrade", "movistar total", "total", "migrar", "ahorrar", "ahorro", "convergente", "fibra y movil", "unificar", "oferta", "promocion", "promoción", "plan nuevo", "mejorar"]):
         nbo_data = evaluar_upgrade_movistar_total(cid)
         
@@ -194,9 +201,8 @@ def process_user_message(client_id: str, user_query: str) -> str:
             f"¿Deseas que activemos tu solicitud de migración ahora mismo?"
         )
 
-    # Intención 4: Fraccionamiento de deuda
+    # 4. Intención: Fraccionamiento de deuda
     if any(k in q for k in ["fraccionar", "fraccionamiento", "cuotas", "pagar en partes", "diferir", "deuda"]):
-        recibo_info = consultar_recibo(cid)
         monto_actual = CLIENTES_CATALOGO.get(cid, {}).get("recibo_actual", 119.90)
         return (
             f"💳 **Planes de Fraccionamiento sin Intereses (TCEA 0.0%):**\n\n"
@@ -207,7 +213,7 @@ def process_user_message(client_id: str, user_query: str) -> str:
             f"Puedes solicitarlo directamente desde la pestaña de Soluciones Comerciales en tu pantalla."
         )
 
-    # Intención 5: Saludo o consulta general
+    # 5. Saludo o inicio
     if any(k in q for k in ["hola", "buenos dias", "buenas tardes", "buenas noches", "hey", "ayuda", "inicio"]):
         cliente_nombre = CLIENTES_CATALOGO.get(cid, {}).get("nombre", "Cliente")
         return (

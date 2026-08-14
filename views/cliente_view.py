@@ -1,17 +1,24 @@
 """
 views/cliente_view.py - Vista Interactiva del Modo Cliente
 Incluye selector de cliente por DNI/Teléfono, KPIs de facturación, desglose diff_engine,
-módulo comercial interactivo (fraccionamiento vs. Movistar Total) y chat conversacional agéntico.
+módulo comercial interactivo y chat agéntico con escalamiento automático y manual a humanos.
 """
 
 import streamlit as st
 from state_manager import (
     CLIENTES_CATALOGO,
     add_chat_message,
-    escalate_case_to_human,
     get_active_client_data
 )
-from services.agent_service import consultar_recibo, evaluar_upgrade_movistar_total, process_user_message
+from services.agent_service import (
+    consultar_recibo,
+    evaluar_upgrade_movistar_total,
+    process_user_message
+)
+from services.escalation_service import (
+    escalar_a_humano,
+    cliente_tiene_ticket_pendiente
+)
 
 
 def render_cliente_view():
@@ -49,6 +56,21 @@ def render_cliente_view():
     cliente = get_active_client_data()
     cid = cliente["id"]
     periodo = cliente["periodo"]
+
+    # Verificar si el cliente tiene un ticket escalado activo
+    ticket_activo = cliente_tiene_ticket_pendiente(cid)
+    if ticket_activo:
+        st.markdown(f"""
+        <div style="background: #fff7ed; border-left: 5px solid #ff6a00; border-radius: 10px; padding: 12px 18px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <strong style="color: #9a3412;">🎫 CASO TRANSFERIDO A ATENCIÓN HUMANA</strong>
+                <div style="font-size: 13px; color: #c2410c; margin-top: 2px;">
+                    Ticket: <strong><code>{ticket_activo['ticket_id']}</code></strong> · Estado: <strong>{ticket_activo['status']}</strong> · Asignado a: <strong>{ticket_activo.get('assigned_agent', 'Cola General')}</strong>
+                </div>
+            </div>
+            <span class="badge-orange">EN COLA DE ASESOR</span>
+        </div>
+        """, unsafe_allow_html=True)
 
     # Ejecutar herramientas del servicio agéntico
     recibo_info = consultar_recibo(cid, periodo)
@@ -233,18 +255,26 @@ def render_cliente_view():
     # 6. Chat Conversacional Agéntico y Botón de Acción Rápida (Asesor Humano)
     st.markdown("### 💬 Asistente Digital Movistar (Chat en Vivo)")
     
-    col_chat_title, col_human_btn = st.columns([2.5, 1.5])
+    col_chat_title, col_human_btn = st.columns([2.3, 1.7])
     with col_chat_title:
         st.caption("Pregúntame sobre el desglose de tu recibo, motivos de cobro o solicita un asesor humano.")
     with col_human_btn:
         if st.button("🚨 Hablar con un asesor humano", key="btn_hablar_asesor_humano", type="secondary", use_container_width=True):
-            ticket_id = escalate_case_to_human(
+            ticket = escalar_a_humano(
                 client_id=cid,
-                client_name=cliente["nombre"],
-                reason=f"Cliente solicita atención humana directa para revisión de su recibo {periodo}."
+                chat_history=st.session_state.chat_history,
+                motivo_detectado="Solicitud manual del cliente desde botón de acción rápida",
+                prioridad="ALTA"
             )
-            add_chat_message("assistant", f"🔔 **He transferido tu caso a un asesor humano.** Tu ticket de atención es **`{ticket_id}`**.")
-            st.warning(f"¡Caso derivado con éxito! Se generó el ticket **{ticket_id}** en la cola de atención CRM.")
+            t_id = ticket["ticket_id"]
+            add_chat_message("user", "Quiero hablar con un asesor humano.")
+            add_chat_message(
+                "assistant",
+                f"🔔 **He transferido tu caso a uno de nuestros asesores especializados.** En breve te atenderán con todo el detalle de tu consulta.\n\n"
+                f"• **Ticket de Atención Asignado:** **`{t_id}`**\n"
+                f"• **Estado:** `PENDIENTE EN COLA PRIORITARIA`"
+            )
+            st.rerun()
 
     # Renderizar historial de mensajes
     for msg in st.session_state.chat_history:
@@ -252,11 +282,15 @@ def render_cliente_view():
             st.markdown(msg["content"])
 
     # Entrada de texto del usuario
-    if prompt := st.chat_input("Escribe tu consulta aquí (ej: ¿Por qué subió mi recibo? / Quiero Movistar Total)..."):
-        # 1. Guardar y mostrar mensaje del usuario
+    if prompt := st.chat_input("Escribe tu consulta aquí (ej: 'comunicarme con un asesor', '¿por qué subió mi recibo?')..."):
+        # 1. Guardar mensaje del usuario
         add_chat_message("user", prompt)
         
-        # 2. Procesar con el motor agéntico (Tool Calling & 0% Alucinaciones)
-        respuesta_bot = process_user_message(client_id=cid, user_query=prompt)
+        # 2. Procesar con el motor agéntico y evaluador de escalamiento
+        respuesta_bot = process_user_message(
+            client_id=cid,
+            user_query=prompt,
+            chat_history=st.session_state.chat_history
+        )
         add_chat_message("assistant", respuesta_bot)
         st.rerun()
