@@ -272,25 +272,39 @@ def render_cliente_view():
                 "assistant",
                 f"🔔 **He transferido tu caso a uno de nuestros asesores especializados.** En breve te atenderán con todo el detalle de tu consulta.\n\n"
                 f"• **Ticket de Atención Asignado:** **`{t_id}`**\n"
-                f"• **Estado:** `PENDIENTE EN COLA PRIORITARIA`"
+                f"• **Estado:** `PENDIENTE EN COLA PRIORITARIA`",
+                metadata={"action_payload": {"action": "TRIGGER_ESCALATION", "ticket_id": t_id}}
             )
             st.rerun()
 
-    # Renderizar historial de mensajes
-    for msg in st.session_state.chat_history:
+    # Importar renderizador de elementos interactivos de chat
+    from components.chat_elements import render_chat_action_elements
+    from services.gemini_service import get_gemini_response
+
+    # Renderizar historial de mensajes y widgets de acción interactivos
+    for msg_idx, msg in enumerate(st.session_state.chat_history):
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
+            if msg["role"] == "assistant":
+                render_chat_action_elements(msg, msg_idx, cliente)
 
     # Entrada de texto del usuario
-    if prompt := st.chat_input("Escribe tu consulta aquí (ej: 'comunicarme con un asesor', '¿por qué subió mi recibo?')..."):
+    if prompt := st.chat_input("Escribe tu consulta aquí (ej: 'me interesa la oferta de movistar total', '¿por qué subió mi recibo?')..."):
         # 1. Guardar mensaje del usuario
         add_chat_message("user", prompt)
         
-        # 2. Procesar con el motor agéntico y evaluador de escalamiento
-        respuesta_bot = process_user_message(
-            client_id=cid,
-            user_query=prompt,
-            chat_history=st.session_state.chat_history
+        # 2. Procesar con el cliente Gemini / Yara AI
+        gemini_res = get_gemini_response(
+            chat_history=st.session_state.chat_history,
+            user_message=prompt,
+            client_context=cliente
         )
-        add_chat_message("assistant", respuesta_bot)
+        
+        # 3. Guardar respuesta del asistente con metadata de acción interactiva
+        add_chat_message(
+            role="assistant",
+            content=gemini_res["response_text"],
+            metadata={"action_payload": gemini_res.get("action_payload")}
+        )
         st.rerun()
+
