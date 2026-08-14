@@ -1,0 +1,26 @@
+# Archivos multimedia pesados (>100MB rechazados por GitHub)
+*.mp4
+*.avi
+*.mov
+*.zip
+
+# Base de datos SQLite local (autogenerada por init_db.py)
+*.db
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+
+# Python Cache y Entornos
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+
+# Logs y Archivos temporales del SO
+*.log
+.DS_Store
+Thumbs.db

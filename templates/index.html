@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movistar | Asistente Digital de Facturación y Ventas</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Custom Corporate CSS -->
+  <link rel="stylesheet" href="/static/css/styles.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            movistar: {
+              navy: '#0a2540',
+              'navy-dark': '#051626',
+              blue: '#005cff',
+              'blue-hover': '#004bd6',
+              'blue-light': '#e8f1ff',
+              orange: '#ff6a00',
+              'orange-hover': '#e55e00',
+              'orange-light': '#fff3eb',
+              green: '#00a650',
+              'green-light': '#e6f7ee'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="min-h-full flex flex-col font-sans text-slate-800 antialiased selection:bg-movistar-blue selection:text-white pb-12">
+
+  <!-- ====================================================================
+       1. HEADER CORPORATIVO AZUL (#0a2540) Y NARANJA (#ff6a00)
+       ==================================================================== -->
+  <header class="header-gradient text-white shadow-lg">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+      
+      <!-- Top Navigation & Brand -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-movistar-blue flex items-center justify-center shadow-md font-black text-2xl tracking-tighter text-white">
+            M
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="text-xl font-bold tracking-tight text-white">Movistar</span>
+              <span class="text-xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-movistar-orange text-white">
+                Asistente Digital AI
+              </span>
+            </div>
+            <p class="text-xs text-slate-300">Auditoría de Facturación y Soluciones Comerciales Inteligentes</p>
+          </div>
+        </div>
+
+        <!-- Selector Rápido de Clientes (Demostración y Casos de Negocio) -->
+        <div class="flex items-center bg-white/10 backdrop-blur-md rounded-xl p-1.5 border border-white/15">
+          <label for="clienteSelector" class="text-xs text-slate-300 font-medium px-2 hidden sm:inline">Cliente:</label>
+          <select id="clienteSelector" onchange="cargarCliente(this.value)" class="bg-movistar-navy text-white text-xs sm:text-sm font-semibold rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-movistar-orange border-0 cursor-pointer">
+            <option value="CLI001" selected>CLI001 - Juan Pérez (Repetidor WiFi +S/ 30.00)</option>
+            <option value="1000001">1000001 - Carlos Mendoza (Elegible Movistar Total)</option>
+            <option value="CLI002">CLI002 - María Torres (Fin Descuento Promo +S/ 20.00)</option>
+            <option value="CLI004">CLI004 - Lucía Ramos (Prorrateo Alta +S/ 25.00)</option>
+            <option value="CLI005">CLI005 - Roberto Díaz (Cuota Equipo ShEq +S/ 35.00)</option>
+            <option value="CLI006">CLI006 - Ana Castro (Reconexión Morosa +S/ 10.50)</option>
+            <option value="CLI003">CLI003 - Pedro Soto (Sin Variación S/ 0.00)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Estado de la Línea y Datos del Cliente Activo -->
+      <div class="mt-6 pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center space-x-4">
+          <div class="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center font-bold text-lg text-movistar-orange border border-white/20" id="avatarLetra">
+            J
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <h2 class="text-base sm:text-lg font-bold text-white" id="nombreCliente">Juan Pérez</h2>
+              <span id="badgeEstadoLinea" class="px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                Línea Activa
+              </span>
+            </div>
+            <p class="text-xs text-slate-300">
+              ID: <span class="font-mono font-medium text-white" id="displayIdCliente">CLI001</span> | 
+              Servicio: <span class="font-medium text-white" id="displayServicioCliente">Fibra 600 Mbps + Móvil</span> | 
+              Periodo: <span class="font-medium text-movistar-orange" id="displayPeriodo">2026-07 (Julio 2026)</span>
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 text-xs">
+          <div class="px-3 py-1.5 rounded-lg bg-white/10 border border-white/10 text-right">
+            <span class="text-slate-300 block">Vencimiento</span>
+            <span class="font-bold text-white" id="displayVencimiento">21 de Julio, 2026</span>
+          </div>
+          <div class="px-3 py-1.5 rounded-lg bg-movistar-orange/20 border border-movistar-orange/40 text-right">
+            <span class="text-orange-200 block">Total a Pagar</span>
+            <span class="font-bold text-white text-sm" id="displayTotalPagar">S/ 119.90</span>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ====================================================================
+       2. CONTENEDOR PRINCIPAL / DASHBOARD
+       ==================================================================== -->
+  <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 -mt-4 sm:-mt-6 flex-1 w-full space-y-6">
+
+    <!-- KPI CARDS: Resumen Financiero y Auditoría de Variación -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      
+      <!-- KPI 1: Recibo Actual -->
+      <div class="card-premium p-4 sm:p-5 flex flex-col justify-between border-l-4 border-l-movistar-blue">
+        <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider">
+          <span>Recibo Actual</span>
+          <span class="text-movistar-blue text-base">📄</span>
+        </div>
+        <div class="mt-2">
+          <div class="text-2xl sm:text-3xl font-extrabold text-slate-900" id="kpiReciboActual">S/ 119.90</div>
+          <p class="text-xs text-slate-500 mt-1" id="kpiPeriodoActual">Periodo: Julio 2026</p>
+        </div>
+      </div>
+
+      <!-- KPI 2: Recibo Anterior -->
+      <div class="card-premium p-4 sm:p-5 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider">
+          <span>Recibo Anterior</span>
+          <span class="text-slate-400 text-base">🗓️</span>
+        </div>
+        <div class="mt-2">
+          <div class="text-2xl sm:text-3xl font-bold text-slate-700" id="kpiReciboAnterior">S/ 89.90</div>
+          <p class="text-xs text-slate-500 mt-1" id="kpiPeriodoAnterior">Periodo: Junio 2026</p>
+        </div>
+      </div>
+
+      <!-- KPI 3: Variación de Cobro (diff_engine.py) -->
+      <div class="card-premium p-4 sm:p-5 flex flex-col justify-between border-l-4 border-l-movistar-orange" id="kpiVariacionCard">
+        <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider">
+          <span>Variación de Cobro</span>
+          <span id="kpiVariacionIcon" class="text-movistar-orange font-bold text-lg">▲</span>
+        </div>
+        <div class="mt-2">
+          <div class="text-2xl sm:text-3xl font-extrabold text-movistar-orange flex items-baseline gap-2" id="kpiVariacionMonto">
+            +S/ 30.00
+            <span class="text-xs sm:text-sm font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-movistar-orange" id="kpiVariacionPct">+33.37%</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1" id="kpiVariacionCausa">Causa: Instalación repetidor</p>
+        </div>
+      </div>
+
+      <!-- KPI 4: Estado de Cobranza -->
+      <div class="card-premium p-4 sm:p-5 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider">
+          <span>Estado de Cobranza</span>
+          <span class="text-emerald-500 text-base">🛡️</span>
+        </div>
+        <div class="mt-2">
+          <div class="text-2xl sm:text-3xl font-extrabold text-slate-800" id="kpiEstadoCobranza">Sin Deuda Vencida</div>
+          <p class="text-xs text-emerald-600 font-medium mt-1 flex items-center gap-1">
+            <span>✓</span> Apto para beneficios comerciales
+          </p>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- EXPLICACIÓN DETALLADA Y DESGLOSE DE CONCEPTOS (diff_engine.py) -->
+    <section class="card-premium p-5 sm:p-6 bg-gradient-to-br from-white via-slate-50 to-blue-50/20">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-200">
+        <div class="flex items-center space-x-3">
+          <div class="w-9 h-9 rounded-xl bg-movistar-blue/10 text-movistar-blue flex items-center justify-center font-bold text-lg">
+            🔍
+          </div>
+          <div>
+            <h3 class="text-base sm:text-lg font-bold text-slate-900">Auditoría Explicativa del Recibo</h3>
+            <p class="text-xs text-slate-500">Descomposición analítica de la variación de cobro calculada en tiempo real</p>
+          </div>
+        </div>
+        <span class="text-xs font-mono px-2.5 py-1 rounded-md bg-slate-200/70 text-slate-700 font-semibold self-start sm:self-auto">
+          Motor: diff_engine.py
+        </span>
+      </div>
+
+      <!-- Mensaje Asistente Virtual -->
+      <div class="mt-4 p-4 rounded-xl bg-white border border-slate-200 shadow-sm flex items-start gap-3.5">
+        <div class="w-8 h-8 rounded-full bg-movistar-blue text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+          AI
+        </div>
+        <div class="text-sm space-y-1">
+          <p class="font-semibold text-slate-900" id="assistantHeadline">
+            Tu recibo aumentó S/ 30.00 (+33.37%) debido a 1 nuevo concepto aplicado este periodo.
+          </p>
+          <p class="text-slate-600 text-xs sm:text-sm leading-relaxed" id="assistantExplanation">
+            Identificamos el cargo correspondiente a la <strong class="text-movistar-navy">"Instalación de repetidor WiFi"</strong> contratada el mes anterior. Tu cargo fijo mensual de <strong class="text-movistar-navy">Plan Fibra 600 (S/ 89.90)</strong> se mantiene sin alteraciones.
+          </p>
+        </div>
+      </div>
+
+      <!-- Tabla / Lista de Conceptos Adicionales Identificados -->
+      <div class="mt-4">
+        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Conceptos y Variaciones Detectadas</h4>
+        <div class="space-y-2" id="conceptosContainer">
+          <!-- Renderizado dinámico desde JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         3. MÓDULO INTERACTIVO DE SOLUCIÓN COMERCIAL (TOGGLE SWITCHER)
+         ==================================================================== -->
+    <section class="card-premium p-5 sm:p-7 border-2 border-movistar-blue/20">
+      
+      <!-- Header del Módulo Comercial -->
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-widest text-movistar-orange">Soluciones Personalizadas</span>
+          <h3 class="text-xl sm:text-2xl font-extrabold text-movistar-navy mt-0.5">Elige la Mejor Alternativa para tu Línea</h3>
+          <p class="text-xs sm:text-sm text-slate-500">Selecciona entre facilidades de pago o ahorra unificando tus servicios con Movistar Total</p>
+        </div>
+
+        <!-- Selector Interactivo (Toggle) -->
+        <div class="inline-flex p-1 rounded-xl bg-slate-200/80 border border-slate-300 self-start md:self-auto">
+          <button id="toggleFraccBtn" onclick="cambiarSolucion('fraccionamiento')" class="toggle-tab-btn active px-4 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center gap-2">
+            <span>💳</span>
+            <span>Fraccionar Deuda (0% Int.)</span>
+          </button>
+          <button id="toggleMtBtn" onclick="cambiarSolucion('movistar_total')" class="toggle-tab-btn px-4 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center gap-2">
+            <span>🚀</span>
+            <span>Upgrade Movistar Total (NBO)</span>
+            <span class="px-1.5 py-0.2 text-[10px] font-extrabold rounded bg-movistar-orange text-white pulse-mt">AHORRA 50%</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- VISTA A: FRACCIONAMIENTO DE DEUDA SIN INTERESES -->
+      <div id="vistaFraccionamiento" class="animate-fade-in space-y-6">
+        
+        <div class="p-4 rounded-xl bg-blue-50/50 border border-blue-100 flex items-center justify-between flex-wrap gap-3">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">🤝</span>
+            <div>
+              <h4 class="font-bold text-movistar-navy text-sm sm:text-base">Plan de Alivio Financiero sin Intereses</h4>
+              <p class="text-xs text-slate-600">Fracciona el importe de tu recibo en cuotas mensuales directas en tus próximos ciclos.</p>
+            </div>
+          </div>
+          <span class="px-3 py-1 text-xs font-bold rounded-full bg-emerald-100 text-emerald-800">
+            0% Tasa de Interés (TCEA 0.0%)
+          </span>
+        </div>
+
+        <!-- Simulador de Cuotas -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          
+          <!-- Opción 3 Cuotas -->
+          <div onclick="seleccionarCuota(3)" id="cardCuota3" class="p-4 rounded-xl border-2 border-movistar-blue bg-blue-50/30 cursor-pointer transition-all hover:shadow-md relative">
+            <div class="absolute top-3 right-3 w-4 h-4 rounded-full border-2 border-movistar-blue flex items-center justify-center" id="radioCuota3">
+              <span class="w-2 h-2 rounded-full bg-movistar-blue"></span>
+            </div>
+            <span class="text-xs font-bold uppercase tracking-wider text-movistar-blue">3 Meses</span>
+            <div class="text-2xl font-extrabold text-slate-900 mt-2" id="montoCuota3">S/ 39.97 / mes</div>
+            <p class="text-xs text-slate-500 mt-1">3 cuotas fijas de S/ 39.97</p>
+          </div>
+
+          <!-- Opción 6 Cuotas -->
+          <div onclick="seleccionarCuota(6)" id="cardCuota6" class="p-4 rounded-xl border-2 border-slate-200 bg-white cursor-pointer transition-all hover:border-slate-300 hover:shadow-md relative">
+            <div class="absolute top-3 right-3 w-4 h-4 rounded-full border-2 border-slate-300 flex items-center justify-center" id="radioCuota6">
+              <span class="w-2 h-2 rounded-full bg-transparent"></span>
+            </div>
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">6 Meses</span>
+            <div class="text-2xl font-extrabold text-slate-900 mt-2" id="montoCuota6">S/ 19.98 / mes</div>
+            <p class="text-xs text-slate-500 mt-1">6 cuotas fijas de S/ 19.98</p>
+          </div>
+
+          <!-- Opción 12 Cuotas -->
+          <div onclick="seleccionarCuota(12)" id="cardCuota12" class="p-4 rounded-xl border-2 border-slate-200 bg-white cursor-pointer transition-all hover:border-slate-300 hover:shadow-md relative">
+            <div class="absolute top-3 right-3 w-4 h-4 rounded-full border-2 border-slate-300 flex items-center justify-center" id="radioCuota12">
+              <span class="w-2 h-2 rounded-full bg-transparent"></span>
+            </div>
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">12 Meses</span>
+            <div class="text-2xl font-extrabold text-slate-900 mt-2" id="montoCuota12">S/ 9.99 / mes</div>
+            <p class="text-xs text-slate-500 mt-1">12 cuotas fijas de S/ 9.99</p>
+          </div>
+
+        </div>
+
+        <!-- Condiciones y CTA -->
+        <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div class="text-xs text-slate-600 space-y-1">
+            <p class="flex items-center gap-1.5 font-medium text-slate-800">
+              <span class="text-emerald-500 font-bold">✓</span> Aprobación automática en sistema sin trámites.
+            </p>
+            <p class="flex items-center gap-1.5">
+              <span class="text-emerald-500 font-bold">✓</span> Tu servicio se mantiene activo y protegido ante cortes.
+            </p>
+          </div>
+
+          <button onclick="confirmarFraccionamiento()" class="btn-movistar-primary px-6 py-3 text-sm flex items-center gap-2 shrink-0 w-full sm:w-auto justify-center">
+            <span>Solicitar Fraccionamiento en <span id="btnCuotasTexto">3 Cuotas</span></span>
+            <span>→</span>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- VISTA B: UPGRADE A MOVISTAR TOTAL (NBO ENGINE) -->
+      <div id="vistaMovistarTotal" class="animate-fade-in space-y-6 hidden">
+        
+        <!-- Tarjeta Hero de la Oferta Convergente -->
+        <div class="rounded-2xl p-6 bg-gradient-to-br from-movistar-navy via-[#0d3b66] to-movistar-blue text-white shadow-xl relative overflow-hidden">
+          
+          <div class="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            
+            <div class="space-y-3 max-w-xl">
+              <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-movistar-orange text-white text-xs font-black tracking-wide uppercase">
+                <span>⭐ Recomendación Óptima NBO</span>
+                <span>•</span>
+                <span id="mtAhorroPill">AHORRA S/ 29.40 / MES</span>
+              </div>
+              
+              <h4 class="text-2xl sm:text-3xl font-black tracking-tight" id="mtNombreOferta">
+                Movistar Total Dúo 200 Mbps + 1 Línea
+              </h4>
+              
+              <p class="text-sm text-slate-200" id="mtDescripcion">
+                Fibra óptica simétrica 200 Mbps de alta velocidad para el hogar + 1 Línea móvil ilimitada con 65GB en un único recibo unificado.
+              </p>
+
+              <!-- Features Grid -->
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
+                <div class="p-2.5 rounded-xl bg-white/10 backdrop-blur-sm border border-white/10">
+                  <span class="text-[11px] text-slate-300 block">Velocidad Fija</span>
+                  <span class="font-extrabold text-base text-white" id="mtVelocidad">200 Mbps</span>
+                </div>
+                <div class="p-2.5 rounded-xl bg-white/10 backdrop-blur-sm border border-white/10">
+                  <span class="text-[11px] text-slate-300 block">Datos Móviles</span>
+                  <span class="font-extrabold text-base text-white" id="mtGigas">65 GB Full</span>
+                </div>
+                <div class="p-2.5 rounded-xl bg-white/10 backdrop-blur-sm border border-white/10 col-span-2 sm:col-span-1">
+                  <span class="text-[11px] text-slate-300 block">Ahorro Anual</span>
+                  <span class="font-extrabold text-base text-movistar-orange" id="mtAhorroAnual">S/ 352.80</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Pricing Box -->
+            <div class="bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/20 text-center shrink-0 min-w-[240px]">
+              <span class="text-xs text-slate-300 line-through" id="mtPrecioRegular">Antes: S/ 139.80 (Fragmentado)</span>
+              <div class="text-3xl sm:text-4xl font-black text-white mt-1" id="mtPrecioPromo">S/ 110.40</div>
+              <span class="text-xs text-slate-200 block">Precio mensual promocional</span>
+              
+              <div class="mt-4 pt-3 border-t border-white/10 text-xs text-emerald-300 font-semibold flex items-center justify-center gap-1">
+                <span>🛡️</span> Palanca de Blindaje Convergente
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Comparativa Financiera y Datos del Motor NBO -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          
+          <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+            <h5 class="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-2">
+              <span>📊</span> Comparativa de Ahorro Económico
+            </h5>
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between text-slate-600">
+                <span>Gasto actual en servicios separados:</span>
+                <span class="font-bold text-slate-800" id="compGastoSeparado">S/ 139.80 / mes</span>
+              </div>
+              <div class="flex justify-between text-slate-600">
+                <span>Precio unificado Movistar Total:</span>
+                <span class="font-bold text-movistar-blue" id="compPrecioMT">S/ 110.40 / mes</span>
+              </div>
+              <div class="pt-2 border-t border-slate-200 flex justify-between text-base font-extrabold text-emerald-600">
+                <span>Ahorro mensual neto:</span>
+                <span id="compAhorroNeto">S/ 29.40 (21.03%)</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+            <h5 class="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-2">
+              <span>🎯</span> Inteligencia de Negocio (nbo_engine.py)
+            </h5>
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between text-slate-600">
+                <span>Probabilidad simulada de aceptación:</span>
+                <span class="font-bold text-slate-800" id="nboProbabilidad">46% (Propensión Media-Alta)</span>
+              </div>
+              <div class="flex justify-between text-slate-600">
+                <span>Canal óptimo de contacto sugerido:</span>
+                <span class="font-bold text-movistar-orange" id="nboCanal">SMS / APP MOVISTAR</span>
+              </div>
+              <div class="pt-2 border-t border-slate-200 text-xs text-slate-500 italic" id="nboMotivoSummary">
+                "Unificación de recibo y ahorro financiero de hasta 50% vs. servicios fragmentados."
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- CTA Movistar Total -->
+        <div class="p-4 rounded-xl bg-orange-50 border border-orange-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div class="text-xs text-orange-950 space-y-0.5">
+            <p class="font-bold text-sm text-movistar-orange">¡Migra ahora y recibe instalación prioritaria gratuita!</p>
+            <p class="text-slate-600">Conserva tus mismos números móviles y aumenta tu velocidad de navegación inmediatamente.</p>
+          </div>
+
+          <button onclick="confirmarMigracionMT()" class="btn-movistar-orange px-6 py-3.5 text-sm flex items-center gap-2 shrink-0 w-full sm:w-auto justify-center">
+            <span>Aceptar Migración a Movistar Total</span>
+            <span>🚀</span>
+          </button>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ====================================================================
+       4. MODAL / TOAST DE CONFIRMACIÓN DE ACCIÓN
+       ==================================================================== -->
+  <div id="modalConfirmacion" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-fade-in border border-slate-100">
+      <div class="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-2xl font-black mx-auto">
+        ✓
+      </div>
+      <div class="text-center space-y-1">
+        <h3 class="text-lg font-bold text-slate-900" id="modalTitulo">¡Solicitud Procesada Exitosamente!</h3>
+        <p class="text-xs sm:text-sm text-slate-600" id="modalMensaje">
+          Se ha generado la orden de solicitud en los sistemas comerciales de Movistar.
+        </p>
+      </div>
+      <div class="p-3 rounded-xl bg-slate-50 text-xs text-slate-600 font-mono text-center" id="modalDetalle">
+        Código de Operación: MOV-202607-88491
+      </div>
+      <button onclick="cerrarModal()" class="w-full py-2.5 rounded-xl bg-movistar-navy text-white font-semibold text-sm hover:bg-movistar-navy-dark transition-all">
+        Entendido y Cerrar
+      </button>
+    </div>
+  </div>
+
+  <!-- ====================================================================
+       5. VANILLA JAVASCRIPT: LOGICA Y ESTADOS VISUALES
+       ==================================================================== -->
+  <script>
+    // Datos de Clientes y Resultados de diff_engine.py y nbo_engine.py
+    const CLIENTES_DATA = {
+      "CLI001": {
+        id: "CLI001",
+        nombre: "Juan Pérez",
+        servicio: "Plan Fibra 600 Mbps + Móvil",
+        periodo: "2026-07",
+        periodoAnterior: "2026-06",
+        vencimiento: "21 de Julio, 2026",
+        reciboActual: 119.90,
+        reciboAnterior: 89.90,
+        variacion: { monto: 30.00, porcentaje: 33.37 },
+        conceptos: [
+          { concepto: "Instalación de repetidor WiFi", monto: 30.00, tipo: "cargo_unico", tag: "Cargo Único (Instalación)" }
+        ],
+        asistente: {
+          headline: "Tu recibo aumentó S/ 30.00 (+33.37%) debido a 1 cargo único aplicado este periodo.",
+          explanation: "Identificamos el concepto de <strong>'Instalación de repetidor WiFi'</strong> contratado en junio. Tu cargo mensual de <strong>Plan Fibra 600 (S/ 89.90)</strong> se mantiene sin alteraciones."
+        },
+        nbo: {
+          elegibleMT: true,
+          nombreOferta: "Movistar Total Dúo 200 Mbps + 1 Línea",
+          velocidad: "200 Mbps",
+          gigas: "65 GB Full",
+          precioPromo: 110.40,
+          gastoSeparado: 139.80,
+          ahorroMensual: 29.40,
+          ahorroPct: 21.03,
+          ahorroAnual: 352.80,
+          probabilidad: 46,
+          canal: "SMS / APP MOVISTAR"
+        }
+      },
+      "1000001": {
+        id: "1000001",
+        nombre: "Carlos Mendoza",
+        servicio: "Fibra Óptica 500 Mbps Pro",
+        periodo: "2026-07",
+        periodoAnterior: "2026-06",
+        vencimiento: "24 de Julio, 2026",
+        reciboActual: 111.90,
+        reciboAnterior: 111.90,
+        variacion: { monto: 0.00, porcentaje: 0.00 },
+        conceptos: [],
+        asistente: {
+          headline: "Tu recibo no presenta variaciones este periodo (S/ 111.90 al día).",
+          explanation: "Tu servicio de Fibra Óptica 500 Mbps se encuentra al día. <strong>¡Eres elegible para migrar a Movistar Total!</strong> Puedes unificar tus líneas móviles y ahorrar hasta S/ 352.80 al año."
+        },
+        nbo: {
+          elegibleMT: true,
+          nombreOferta: "Movistar Total Dúo 200 Mbps + 1 Línea",
+          velocidad: "200 Mbps",
+          gigas: "65 GB",
+          precioPromo: 110.40,
+          gastoSeparado: 139.80,
+          ahorroMensual: 29.40,
+          ahorroPct: 21.03,
+          ahorroAnual: 352.80,
+          probabilidad: 56,
+          canal: "SMS"
+        }
+      },
+      "CLI002": {
+        id: "CLI002",
+        nombre: "María Torres",
+        servicio: "Plan Fibra 1000 Mbps",
+        periodo: "2026-07",
+        periodoAnterior: "2026-06",
+        vencimiento: "19 de Julio, 2026",
+        reciboActual: 129.90,
+        reciboAnterior: 109.90,
+        variacion: { monto: 20.00, porcentaje: 18.20 },
+        conceptos: [
+          { concepto: "Fin de Descuento Promocional", monto: 20.00, tipo: "fin_descuento", tag: "Expiración de Promoción" }
+        ],
+        asistente: {
+          headline: "Tu recibo aumentó S/ 20.00 (+18.20%) por finalización de descuento promocional.",
+          explanation: "Culminó el periodo de 6 meses con descuento especial (-S/ 20.00) en tu Plan Fibra 1000. Tu plan ha retornado a su tarifa estándar regular de S/ 129.90."
+        },
+        nbo: {
+          elegibleMT: true,
+          nombreOferta: "Movistar Total Dúo 300 Mbps + 2 Líneas",
+          velocidad: "300 Mbps",
+          gigas: "100 GB",
+          precioPromo: 135.90,
+          gastoSeparado: 189.90,
+          ahorroMensual: 54.00,
+          ahorroPct: 28.44,
+          ahorroAnual: 648.00,
+          probabilidad: 68,
+          canal: "APP_MOVISTAR"
+        }
+      },
+      "CLI004": {
+        id: "CLI004",
+        nombre: "Lucía Ramos",
+        servicio: "Plan Fibra 300 Mbps",
+        periodo: "2026-07",
+        periodoAnterior: "2026-06",
+        vencimiento: "22 de Julio, 2026",
+        reciboActual: 104.90,
+        reciboAnterior: 79.90,
+        variacion: { monto: 25.00, porcentaje: 31.29 },
+        conceptos: [
+          { concepto: "Prorrateo por cambio de plan proporcional", monto: 25.00, tipo: "prorrateo", tag: "Prorrateo Días Proporcionales" }
+        ],
+        asistente: {
+          headline: "Tu recibo presenta un cargo proporcional de S/ 25.00 por cambio de ciclo/alta.",
+          explanation: "Se aplicó el prorrateo de días utilizados entre la fecha de activación de tu nuevo plan y el cierre de ciclo de facturación."
+        },
+        nbo: {
+          elegibleMT: true,
+          nombreOferta: "Movistar Total Dúo 200 Mbps + 1 Línea",
+          velocidad: "200 Mbps",
+          gigas: "65 GB",
+          precioPromo: 110.40,
+          gastoSeparado: 139.80,
+          ahorroMensual: 29.40,
+          ahorroPct: 21.03,
+          ahorroAnual: 352.80,
+          probabilidad: 52,
+          canal: "WHATSAPP"
+        }
+      },
+      "CLI005": {
+        id: "CLI005",
+        nombre: "Roberto Díaz",
+        servicio: "Plan Móvil Ilimitado 65GB",
+        periodo: "2026-07",
+        periodoAnterior: "2026-06",
+        vencimiento: "25 de Julio, 2026",
+        reciboActual: 94.90,
+        reciboAnterior: 59.90,
+        variacion: { monto: 35.00, porcentaje: 58.43 },
+        conceptos: [
+          { concepto: "Cuota 1/12 Equipo financiado (ShEq)", monto: 35.00, tipo: "cuota_equipo", tag: "Cuota Equipo ShEq" }
+        ],
+        asistente: {
+          headline: "Tu recibo aumentó S/ 35.00 por inicio de cuota de equipo financiado (ShEq).",
+          explanation: "Corresponde a la primera cuota (1 de 12) del smartphone financiado recientemente. Tu plan móvil base de S/ 59.90 se mantiene igual."
+        },
+        nbo: {
+          elegibleMT: true,
+          nombreOferta: "Movistar Total Dúo 200 Mbps + 1 Línea",
+          velocidad: "200 Mbps",
+          gigas: "65 GB",
+          precioPromo: 110.40,
+          gastoSeparado: 149.80,
+          ahorroMensual: 39.40,
+          ahorroPct: 26.30,
+          ahorroAnual: 472.80,
+          probabilidad: 62,
+          canal: "CALL_CENTER"
+        }
+      },
+      "CLI006": {
+        id: "CLI006",
+        nombre: "Ana Castro",
+        servicio: "Plan Dúo Básico",
+        periodo: "2026-07",
+        periodoAnterior: "2026-06",
+        vencimiento: "20 de Julio, 2026",
+        reciboActual: 75.50,
+        reciboAnterior: 65.00,
+        variacion: { monto: 10.50, porcentaje: 16.15 },
+        conceptos: [
+          { concepto: "Cargo por Reconexión tras corte moroso", monto: 10.50, tipo: "cargo_reconexion", tag: "Cargo Reconexión (OC1)" }
+        ],
+        asistente: {
+          headline: "Tu recibo incluye un cargo único de S/ 10.50 por reconexión del servicio.",
+          explanation: "Este cargo regulado se aplica tras la reposición de la línea posterior al pago de recibos pendientes."
+        },
+        nbo: {
+          elegibleMT: true,
+          nombreOferta: "Movistar Total Dúo 200 Mbps + 1 Línea",
+          velocidad: "200 Mbps",
+          gigas: "65 GB",
+          precioPromo: 110.40,
+          gastoSeparado: 139.80,
+          ahorroMensual: 29.40,
+          ahorroPct: 21.03,
+          ahorroAnual: 352.80,
+          probabilidad: 40,
+          canal: "SMS"
+        }
+      },
+      "CLI003": {
+        id: "CLI003",
+        nombre: "Pedro Soto",
+        servicio: "Plan Fibra 400 Mbps",
+        periodo: "2026-07",
+        periodoAnterior: "2026-06",
+        vencimiento: "28 de Julio, 2026",
+        reciboActual: 69.90,
+        reciboAnterior: 69.90,
+        variacion: { monto: 0.00, porcentaje: 0.00 },
+        conceptos: [],
+        asistente: {
+          headline: "Tu recibo no presenta variaciones este periodo.",
+          explanation: "El monto facturado en julio (S/ 69.90) es exactamente idéntico al del mes anterior."
+        },
+        nbo: {
+          elegibleMT: true,
+          nombreOferta: "Movistar Total Dúo 200 Mbps + 1 Línea",
+          velocidad: "200 Mbps",
+          gigas: "65 GB",
+          precioPromo: 110.40,
+          gastoSeparado: 139.80,
+          ahorroMensual: 29.40,
+          ahorroPct: 21.03,
+          ahorroAnual: 352.80,
+          probabilidad: 35,
+          canal: "APP_MOVISTAR"
+        }
+      }
+    };
+
+    let clienteActual = CLIENTES_DATA["CLI001"];
+    let cuotasSeleccionadas = 3;
+
+    // Cargar datos de cliente seleccionado
+    function cargarCliente(id) {
+      if (CLIENTES_DATA[id]) {
+        clienteActual = CLIENTES_DATA[id];
+        renderizarVista();
+      }
+    }
+
+    function renderizarVista() {
+      const c = clienteActual;
+      
+      // Header y Perfil
+      document.getElementById("nombreCliente").innerText = c.nombre;
+      document.getElementById("avatarLetra").innerText = c.nombre.charAt(0);
+      document.getElementById("displayIdCliente").innerText = c.id;
+      document.getElementById("displayServicioCliente").innerText = c.servicio;
+      document.getElementById("displayPeriodo").innerText = `${c.periodo} (Julio 2026)`;
+      document.getElementById("displayVencimiento").innerText = c.vencimiento;
+      document.getElementById("displayTotalPagar").innerText = `S/ ${c.reciboActual.toFixed(2)}`;
+
+      // KPIs
+      document.getElementById("kpiReciboActual").innerText = `S/ ${c.reciboActual.toFixed(2)}`;
+      document.getElementById("kpiReciboAnterior").innerText = `S/ ${c.reciboAnterior.toFixed(2)}`;
+      
+      const varMonto = c.variacion.monto;
+      const varPct = c.variacion.porcentaje;
+      const sign = varMonto > 0 ? "+" : "";
+      
+      const kpiVarEl = document.getElementById("kpiVariacionMonto");
+      kpiVarEl.innerHTML = `${sign}S/ ${Math.abs(varMonto).toFixed(2)} <span class="text-xs sm:text-sm font-semibold px-2 py-0.5 rounded-full ${varMonto > 0 ? 'bg-orange-100 text-movistar-orange' : 'bg-emerald-100 text-emerald-700'}" id="kpiVariacionPct">${sign}${varPct.toFixed(2)}%</span>`;
+      
+      const causaText = c.conceptos.length > 0 ? c.conceptos[0].concepto : "Sin variación";
+      document.getElementById("kpiVariacionCausa").innerText = `Causa: ${causaText}`;
+
+      // Asistente AI
+      document.getElementById("assistantHeadline").innerHTML = c.asistente.headline;
+      document.getElementById("assistantExplanation").innerHTML = c.asistente.explanation;
+
+      // Conceptos Adicionales
+      const conceptosCont = document.getElementById("conceptosContainer");
+      conceptosCont.innerHTML = "";
+      if (c.conceptos.length === 0) {
+        conceptosCont.innerHTML = `
+          <div class="p-3 rounded-lg bg-slate-100/80 text-xs text-slate-500 text-center">
+            No se registraron cobros adicionales ni cargos extraordinarios en este ciclo.
+          </div>`;
+      } else {
+        c.conceptos.forEach(item => {
+          const div = document.createElement("div");
+          div.className = "flex items-center justify-between p-3 rounded-xl bg-white border border-slate-200 text-sm";
+          div.innerHTML = `
+            <div class="flex items-center space-x-3">
+              <span class="w-2.5 h-2.5 rounded-full bg-movistar-orange"></span>
+              <div>
+                <span class="font-bold text-slate-800">${item.concepto}</span>
+                <span class="ml-2 text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">${item.tag || item.tipo}</span>
+              </div>
+            </div>
+            <div class="font-extrabold text-movistar-orange">
+              +S/ ${item.monto.toFixed(2)}
+            </div>`;
+          conceptosCont.appendChild(div);
+        });
+      }
+
+      // Simulador de Cuotas
+      const tot = c.reciboActual;
+      document.getElementById("montoCuota3").innerText = `S/ ${(tot / 3).toFixed(2)} / mes`;
+      document.getElementById("montoCuota6").innerText = `S/ ${(tot / 6).toFixed(2)} / mes`;
+      document.getElementById("montoCuota12").innerText = `S/ ${(tot / 12).toFixed(2)} / mes`;
+
+      // NBO Movistar Total
+      const nbo = c.nbo;
+      document.getElementById("mtNombreOferta").innerText = nbo.nombreOferta;
+      document.getElementById("mtVelocidad").innerText = nbo.velocidad;
+      document.getElementById("mtGigas").innerText = nbo.gigas;
+      document.getElementById("mtAhorroAnual").innerText = `S/ ${nbo.ahorroAnual.toFixed(2)}`;
+      document.getElementById("mtAhorroPill").innerText = `AHORRA S/ ${nbo.ahorroMensual.toFixed(2)} / MES`;
+      document.getElementById("mtPrecioRegular").innerText = `Antes: S/ ${nbo.gastoSeparado.toFixed(2)} (Fragmentado)`;
+      document.getElementById("mtPrecioPromo").innerText = `S/ ${nbo.precioPromo.toFixed(2)}`;
+      
+      document.getElementById("compGastoSeparado").innerText = `S/ ${nbo.gastoSeparado.toFixed(2)} / mes`;
+      document.getElementById("compPrecioMT").innerText = `S/ ${nbo.precioPromo.toFixed(2)} / mes`;
+      document.getElementById("compAhorroNeto").innerText = `S/ ${nbo.ahorroMensual.toFixed(2)} (${nbo.ahorroPct.toFixed(2)}%)`;
+      document.getElementById("nboProbabilidad").innerText = `${nbo.probabilidad}% (Propensión Alta)`;
+      document.getElementById("nboCanal").innerText = nbo.canal;
+    }
+
+    // Toggle entre Soluciones
+    function cambiarSolucion(solucion) {
+      const btnFracc = document.getElementById("toggleFraccBtn");
+      const btnMt = document.getElementById("toggleMtBtn");
+      const vistaFracc = document.getElementById("vistaFraccionamiento");
+      const vistaMt = document.getElementById("vistaMovistarTotal");
+
+      if (solucion === "fraccionamiento") {
+        btnFracc.classList.add("active");
+        btnMt.classList.remove("active");
+        vistaFracc.classList.remove("hidden");
+        vistaMt.classList.add("hidden");
+      } else {
+        btnMt.classList.add("active");
+        btnFracc.classList.remove("active");
+        vistaMt.classList.remove("hidden");
+        vistaFracc.classList.add("hidden");
+      }
+    }
+
+    // Selector de Cuotas en Fraccionamiento
+    function seleccionarCuota(cuotas) {
+      cuotasSeleccionadas = cuotas;
+      [3, 6, 12].forEach(n => {
+        const card = document.getElementById(`cardCuota${n}`);
+        const radio = document.getElementById(`radioCuota${n}`);
+        if (n === cuotas) {
+          card.className = "p-4 rounded-xl border-2 border-movistar-blue bg-blue-50/30 cursor-pointer transition-all hover:shadow-md relative";
+          radio.className = "absolute top-3 right-3 w-4 h-4 rounded-full border-2 border-movistar-blue flex items-center justify-center";
+          radio.innerHTML = '<span class="w-2 h-2 rounded-full bg-movistar-blue"></span>';
+        } else {
+          card.className = "p-4 rounded-xl border-2 border-slate-200 bg-white cursor-pointer transition-all hover:border-slate-300 hover:shadow-md relative";
+          radio.className = "absolute top-3 right-3 w-4 h-4 rounded-full border-2 border-slate-300 flex items-center justify-center";
+          radio.innerHTML = '<span class="w-2 h-2 rounded-full bg-transparent"></span>';
+        }
+      });
+      document.getElementById("btnCuotasTexto").innerText = `${cuotas} Cuotas`;
+    }
+
+    // Acciones y Modal
+    function confirmarFraccionamiento() {
+      const cuotaMonto = (clienteActual.reciboActual / cuotasSeleccionadas).toFixed(2);
+      document.getElementById("modalTitulo").innerText = "¡Fraccionamiento Aprobado!";
+      document.getElementById("modalMensaje").innerHTML = `Tu recibo de <strong>S/ ${clienteActual.reciboActual.toFixed(2)}</strong> ha sido fraccionado en <strong>${cuotasSeleccionadas} cuotas fijas de S/ ${cuotaMonto} sin intereses</strong>.<br>La primera cuota se incluirá en tu próximo recibo de Agosto 2026.`;
+      document.getElementById("modalDetalle").innerText = `Operación: FRACC-${clienteActual.id}-${Date.now().toString().slice(-6)}`;
+      document.getElementById("modalConfirmacion").classList.remove("hidden");
+      document.getElementById("modalConfirmacion").classList.add("flex");
+    }
+
+    function confirmarMigracionMT() {
+      const nbo = clienteActual.nbo;
+      document.getElementById("modalTitulo").innerText = "¡Bienvenido a Movistar Total!";
+      document.getElementById("modalMensaje").innerHTML = `Has solicitado la migración a <strong>${nbo.nombreOferta}</strong>.<br>Tu nuevo costo mensual será de <strong>S/ ${nbo.precioPromo.toFixed(2)}</strong> con un ahorro anual estimado de <strong>S/ ${nbo.ahorroAnual.toFixed(2)}</strong>.`;
+      document.getElementById("modalDetalle").innerText = `Solicitud NBO: MT-${clienteActual.id}-${Date.now().toString().slice(-6)}`;
+      document.getElementById("modalConfirmacion").classList.remove("hidden");
+      document.getElementById("modalConfirmacion").classList.add("flex");
+    }
+
+    function cerrarModal() {
+      document.getElementById("modalConfirmacion").classList.add("hidden");
+      document.getElementById("modalConfirmacion").classList.remove("flex");
+    }
+
+    // Inicialización
+    document.addEventListener("DOMContentLoaded", () => {
+      renderizarVista();
+    });
+  </script>
+</body>
+</html>
