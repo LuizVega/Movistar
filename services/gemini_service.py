@@ -10,6 +10,13 @@ import re
 from typing import Dict, Any, List, Optional, Tuple
 
 import config
+from services.agent_tools import (
+    tool_consultar_detalle_recibo,
+    tool_evaluar_upgrade_movistar_total,
+    tool_verificar_reconexiones_notas,
+    GEMINI_CALLABLE_TOOLS,
+    GEMINI_FUNCTIONS_REGISTRY
+)
 from services.agent_service import (
     consultar_recibo,
     evaluar_upgrade_movistar_total,
@@ -17,6 +24,7 @@ from services.agent_service import (
 )
 from database import get_ficha_cliente_completa
 from services.escalation_service import detectar_necesidad_escalamiento, escalar_a_humano
+
 
 # Intentar importar SDK de Google Generative AI
 try:
