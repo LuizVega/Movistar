@@ -166,6 +166,70 @@ def get_historial_por_cliente(cliente_id: int, conn: Optional[sqlite3.Connection
             conn.close()
 
 
+def get_ficha_cliente_completa(cliente_id: Any) -> Dict[str, Any]:
+    """
+    Retorna la ficha técnica y financiera completa del cliente cruzando SQLite y CSVs auxiliares.
+    """
+    cid_str = str(cliente_id).strip().upper()
+    cid_int = int(cid_str) if cid_str.isdigit() else None
+    
+    # Datos desde SQLite
+    cliente_db = get_cliente_by_id(cid_int) if cid_int is not None else None
+
+    # Descuentos y promociones
+    descuentos = []
+    descuentos_csv = "BRAINY_DESCUENTOS_CUOTAS.csv"
+    if os.path.exists(descuentos_csv):
+        try:
+            import csv
+            with open(descuentos_csv, "r", encoding="utf-8", errors="ignore") as f:
+                reader = csv.DictReader(f, delimiter=";")
+                for r in reader:
+                    ba = str(r.get("BillingArrangement") or r.get("cuentafinanciera") or "").strip()
+                    if cid_str in ba or ba in cid_str:
+                        descuentos.append({
+                            "descripcion": r.get("Descripcion", "Descuento Comercial"),
+                            "monto": float(r.get("Monto_Descuento", 0.0)),
+                            "cuota_actual": r.get("CuotaActual", "1"),
+                            "duracion": r.get("PromotionDuration", "1"),
+                            "fecha_fin": r.get("FechaFin", "")
+                        })
+        except Exception:
+            pass
+
+    # Prorrateos
+    prorrateos = []
+    prorrateo_csv = "BRAINY_PRORRATEO_ALTASV3.csv"
+    if os.path.exists(prorrateo_csv):
+        try:
+            import csv
+            with open(prorrateo_csv, "r", encoding="utf-8", errors="ignore") as f:
+                reader = csv.DictReader(f, delimiter=";")
+                for r in reader:
+                    num = str(r.get("Numero") or r.get("CuentaFinanciera") or "").strip()
+                    if cid_str in num or num in cid_str:
+                        prorrateos.append({
+                            "recibo": r.get("NumeroRecibo", ""),
+                            "ciclica": r.get("Ciclica", ""),
+                            "monto": float(r.get("suma_prorrateo", 0.0)),
+                            "tipo": r.get("tiponumero", "M")
+                        })
+        except Exception:
+            pass
+
+    return {
+        "cliente_id": cid_str,
+        "datos_bd": cliente_db,
+        "descuentos_activos": descuentos,
+        "prorrateos_registrados": prorrateos,
+        "antiguedad_meses": cliente_db.get("antiguedad_meses", 12) if cliente_db else 18,
+        "lineas_moviles": cliente_db.get("lineas_moviles_activas", 1) if cliente_db else 1,
+        "region": cliente_db.get("region", "LIMA") if cliente_db else "LIMA",
+        "elegible_mt": bool(cliente_db.get("elegible_mt", 1)) if cliente_db else True,
+        "es_movistar_total": bool(cliente_db.get("es_movistar_total", 0)) if cliente_db else False
+    }
+
+
 if __name__ == "__main__":
     conn = get_connection()
     create_schema(conn)
@@ -173,3 +237,4 @@ if __name__ == "__main__":
     print("Schema creado exitosamente.")
     print("Conteos actuales:", counts)
     conn.close()
+
