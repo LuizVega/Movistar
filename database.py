@@ -87,6 +87,24 @@ def create_schema(conn: sqlite3.Connection, drop_existing: bool = False) -> None
     );
     """)
 
+    # 4. Tabla Órdenes Comerciales (ejecución y trazabilidad de upgrades y fraccionamientos)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS ordenes_comerciales (
+        orden_id TEXT PRIMARY KEY,
+        cliente_id TEXT NOT NULL,
+        tipo_orden TEXT NOT NULL,
+        plan_anterior TEXT,
+        nuevo_plan_id INTEGER,
+        nombre_plan TEXT NOT NULL,
+        monto_nuevo REAL NOT NULL,
+        ahorro_mensual REAL DEFAULT 0.0,
+        fecha_registro TEXT NOT NULL,
+        fecha_vigencia TEXT NOT NULL,
+        canal TEXT NOT NULL,
+        estado TEXT NOT NULL
+    );
+    """)
+
     # Creación de Índices para optimizar consultas de filtrado por cliente_id y oferta_id
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientes_cliente_id ON clientes (cliente_id);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientes_oferta_hogar_id ON clientes (oferta_hogar_id);")
@@ -102,6 +120,10 @@ def create_schema(conn: sqlite3.Connection, drop_existing: bool = False) -> None
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_historial_cliente_oferta ON historial_campanias (cliente_id, oferta_id);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_historial_fecha ON historial_campanias (fecha_contacto);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_historial_acepto ON historial_campanias (acepto_oferta);")
+
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_ordenes_cliente_id ON ordenes_comerciales (cliente_id);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_ordenes_fecha ON ordenes_comerciales (fecha_registro);")
+
 
     conn.commit()
 
@@ -230,6 +252,63 @@ def get_ficha_cliente_completa(cliente_id: Any) -> Dict[str, Any]:
     }
 
 
+def insert_orden_comercial(orden_data: Dict[str, Any], conn: Optional[sqlite3.Connection] = None) -> bool:
+    """Inserta un registro de orden comercial ejecutada en la base de datos."""
+    close_after = False
+    if conn is None:
+        conn = get_connection()
+        close_after = True
+
+    try:
+        # Asegurar esquema de tabla
+        create_schema(conn)
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT OR REPLACE INTO ordenes_comerciales (
+                orden_id, cliente_id, tipo_orden, plan_anterior, nuevo_plan_id,
+                nombre_plan, monto_nuevo, ahorro_mensual, fecha_registro, fecha_vigencia, canal, estado
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            orden_data["orden_id"],
+            str(orden_data["cliente_id"]),
+            orden_data.get("tipo_orden", "UPGRADE_PLAN"),
+            orden_data.get("plan_anterior", ""),
+            orden_data.get("nuevo_plan_id", 10),
+            orden_data.get("nombre_plan", "Movistar Total"),
+            float(orden_data.get("monto_nuevo", 0.0)),
+            float(orden_data.get("ahorro_mensual", 0.0)),
+            orden_data.get("fecha_registro", ""),
+            orden_data.get("fecha_vigencia", ""),
+            orden_data.get("canal", "YARA_AI"),
+            orden_data.get("estado", "PROCESADA")
+        ))
+        conn.commit()
+        return True
+    finally:
+        if close_after:
+            conn.close()
+
+
+def get_ordenes_por_cliente(cliente_id: Any, conn: Optional[sqlite3.Connection] = None) -> List[Dict[str, Any]]:
+    """Retorna la lista de órdenes registradas para un cliente."""
+    close_after = False
+    if conn is None:
+        conn = get_connection()
+        close_after = True
+
+    try:
+        create_schema(conn)
+        cursor = conn.execute("""
+            SELECT * FROM ordenes_comerciales
+            WHERE cliente_id = ?
+            ORDER BY fecha_registro DESC
+        """, (str(cliente_id),))
+        return [dict(row) for row in cursor.fetchall()]
+    finally:
+        if close_after:
+            conn.close()
+
+
 if __name__ == "__main__":
     conn = get_connection()
     create_schema(conn)
@@ -237,4 +316,5 @@ if __name__ == "__main__":
     print("Schema creado exitosamente.")
     print("Conteos actuales:", counts)
     conn.close()
+
 

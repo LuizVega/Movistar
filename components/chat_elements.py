@@ -85,28 +85,31 @@ def render_chat_action_elements(msg: Dict[str, Any], msg_idx: int, client_contex
             with col_b1:
                 if st.button("✅ Autorizar Upgrade a Movistar Total", key=f"btn_auth_mt_{msg_idx}", type="primary", use_container_width=True):
                     st.session_state[action_executed_key] = True
-                    if cid in CLIENTES_CATALOGO:
-                        CLIENTES_CATALOGO[cid]["servicio"] = plan_nombre
-                        CLIENTES_CATALOGO[cid]["recibo_actual"] = precio_promo
-                        CLIENTES_CATALOGO[cid]["estado_linea"] = "Activa - Movistar Total"
+                    from services.order_service import ejecutar_upgrade_plan
+                    
+                    resultado_orden = ejecutar_upgrade_plan(
+                        cliente_id=cid,
+                        nuevo_plan_id=of.get("oferta_id", 10),
+                        canal="YARA_AI"
+                    )
                     
                     st.balloons()
-                    # Mensaje formal de transacción autorizada
+                    # Mensaje oficial y resumen de la operación según criterio de aceptación
                     add_chat_message(
                         role="assistant",
                         content=(
-                            f"🎉 **¡TRANSACCIÓN COMERCIAL AUTORIZADA CON ÉXITO!**\n\n"
-                            f"Has confirmado tu migración a **{plan_nombre}**.\n\n"
-                            f"• **Tarifa Promocional:** `S/ {precio_promo:.2f} / mes`\n"
-                            f"• **Velocidad Fibra:** `{velocidad} Mbps Simétricos`\n"
-                            f"• **Gigas Móviles:** `{gigas} GB Full`\n"
-                            f"• **Ahorro Anual Estimado:** `S/ {ahorro_anio:.2f}`\n"
-                            f"• **Código de Operación:** `OP-MT-{datetime.now().strftime('%Y%m%d%H%M')}`\n\n"
-                            f"Tus beneficios han sido actualizados en el sistema. ¡Gracias por confiar en Movistar!"
+                            f"🎉 **¡Listo! He procesado tu solicitud con éxito.**\n\n"
+                            f"• **Código de Solicitud:** **`{resultado_orden['orden_id']}`**\n"
+                            f"• **Nuevo Plan:** **{resultado_orden['nuevo_plan']}**\n"
+                            f"• **Tarifa Mensual Promocional:** `S/ {resultado_orden['precio_nuevo']:.2f} / mes`\n"
+                            f"• **Ahorro Estimado:** `S/ {resultado_orden['ahorro_mensual']:.2f} / mes` (S/ {resultado_orden['ahorro_anual']:.2f} al año)\n"
+                            f"• **Inicio de Vigencia:** **`{resultado_orden['fecha_vigencia']}`**\n\n"
+                            f"Tu nuevo plan **Movistar Total** estará activo a partir de tu próximo ciclo de facturación sin costos ocultos."
                         ),
-                        metadata={"type": "CONFIRMACION_UPGRADE"}
+                        metadata={"type": "CONFIRMACION_UPGRADE", "orden": resultado_orden}
                     )
                     st.rerun()
+
 
             with col_b2:
                 if st.button("❌ No, mantener mi plan actual", key=f"btn_cancel_mt_{msg_idx}", use_container_width=True):
@@ -162,46 +165,42 @@ def render_chat_action_elements(msg: Dict[str, Any], msg_idx: int, client_contex
         """, unsafe_allow_html=True)
 
         if not is_executed:
+            from services.order_service import ejecutar_fraccionamiento_deuda
             f_col1, f_col2, f_col3, f_col4 = st.columns([1.1, 1.1, 1.1, 1.1])
             
             with f_col1:
                 if st.button(f"3 Cuotas (S/ {total_recibo/3:.2f}/m)", key=f"btn_3c_chat_{msg_idx}", use_container_width=True):
                     st.session_state[action_executed_key] = True
+                    res_f = ejecutar_fraccionamiento_deuda(cid, 3, total_recibo)
                     add_chat_message(
                         role="assistant",
-                        content=(
-                            f"✅ **¡FRACCIONAMIENTO APROBADO EN 3 CUOTAS!**\n\n"
-                            f"Has diferido tu recibo de **S/ {total_recibo:.2f}** en **3 cuotas fijas de S/ {(total_recibo/3):.2f} / mes** sin intereses a partir de Agosto 2026.\n"
-                            f"• **N° Operación:** `FRACC-3M-{datetime.now().strftime('%Y%m%d%H%M')}`"
-                        )
+                        content=res_f["mensaje_yara"],
+                        metadata={"type": "CONFIRMACION_FRACCIONAMIENTO", "orden": res_f}
                     )
                     st.rerun()
 
             with f_col2:
                 if st.button(f"6 Cuotas (S/ {total_recibo/6:.2f}/m)", key=f"btn_6c_chat_{msg_idx}", use_container_width=True):
                     st.session_state[action_executed_key] = True
+                    res_f = ejecutar_fraccionamiento_deuda(cid, 6, total_recibo)
                     add_chat_message(
                         role="assistant",
-                        content=(
-                            f"✅ **¡FRACCIONAMIENTO APROBADO EN 6 CUOTAS!**\n\n"
-                            f"Has diferido tu recibo de **S/ {total_recibo:.2f}** en **6 cuotas fijas de S/ {(total_recibo/6):.2f} / mes** sin intereses a partir de Agosto 2026.\n"
-                            f"• **N° Operación:** `FRACC-6M-{datetime.now().strftime('%Y%m%d%H%M')}`"
-                        )
+                        content=res_f["mensaje_yara"],
+                        metadata={"type": "CONFIRMACION_FRACCIONAMIENTO", "orden": res_f}
                     )
                     st.rerun()
 
             with f_col3:
                 if st.button(f"12 Cuotas (S/ {total_recibo/12:.2f}/m)", key=f"btn_12c_chat_{msg_idx}", use_container_width=True):
                     st.session_state[action_executed_key] = True
+                    res_f = ejecutar_fraccionamiento_deuda(cid, 12, total_recibo)
                     add_chat_message(
                         role="assistant",
-                        content=(
-                            f"✅ **¡FRACCIONAMIENTO APROBADO EN 12 CUOTAS!**\n\n"
-                            f"Has diferido tu recibo de **S/ {total_recibo:.2f}** en **12 cuotas fijas de S/ {(total_recibo/12):.2f} / mes** sin intereses a partir de Agosto 2026.\n"
-                            f"• **N° Operación:** `FRACC-12M-{datetime.now().strftime('%Y%m%d%H%M')}`"
-                        )
+                        content=res_f["mensaje_yara"],
+                        metadata={"type": "CONFIRMACION_FRACCIONAMIENTO", "orden": res_f}
                     )
                     st.rerun()
+
 
             with f_col4:
                 if st.button("👨‍💼 Asesor", key=f"btn_human_fracc_{msg_idx}", use_container_width=True):
