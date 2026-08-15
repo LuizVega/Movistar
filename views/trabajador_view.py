@@ -183,6 +183,9 @@ def render_trabajador_view():
             "estado_linea": "Activa"
         })
 
+        tel_display = cliente_meta.get("telefono") or cliente_meta.get("telefono_movil", "987654321")
+        serv_display = cliente_meta.get("servicio", "Plan Fibra Óptica")
+
         ficha = get_ficha_cliente_completa(cid)
         diff_audit = auditar_variacion_recibo(cid, cliente_meta.get("periodo", "2026-07"))
         nbo_data = generar_next_best_offer(cid)
@@ -194,6 +197,7 @@ def render_trabajador_view():
             "🛠️ **3. Gestión & Resolución**"
         ])
 
+
         # TAB 1: FICHA Y FACTURACIÓN
         with tab1:
             st.markdown(f"""
@@ -202,15 +206,16 @@ def render_trabajador_view():
                     <div>
                         <div style="font-size: 17px; font-weight: 800; color: #0a2540;">{t_sel.get('client_name')}</div>
                         <div style="font-size: 12px; color: #64748b;">
-                            ID: <code>{cid}</code> | Tel: <strong>{cliente_meta['telefono']}</strong> | Plan: <strong>{cliente_meta['servicio']}</strong>
+                            ID: <code>{cid}</code> | Tel: <strong>{tel_display}</strong> | Plan: <strong>{serv_display}</strong>
                         </div>
                     </div>
                     <span style="background: #e6f7ee; color: #00a650; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 9999px;">
-                        ● {cliente_meta.get('estado_linea', 'Activa')}
+                        ● {cliente_meta.get('estado_linea', cliente_meta.get('estado_linea_movil', 'Activa'))}
                     </span>
                 </div>
             </div>
             """, unsafe_allow_html=True)
+
 
             f_c1, f_c2 = st.columns(2)
             with f_c1:

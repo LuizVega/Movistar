@@ -1,101 +1,140 @@
 """
-state_manager.py - Gestor de Estado Global de Sesión para Streamlit (Movistar)
-Soporta persistencia y alternancia fluida entre 'Modo Cliente' y 'Modo Trabajador / Asesor'.
+state_manager.py - Gestor de Estado de Sesión y Memoria Conversacional Multi-Usuario (Streamlit)
+Permite persistir chats individuales por cliente, gestionar roles y tickets de escalamiento.
 """
 
-import streamlit as st
 from datetime import datetime
 from typing import Dict, Any, List, Optional
+import streamlit as st
 
 
-# Clientes precargados de referencia
+# Catálogo de Clientes de Demostración con perfiles representativos
 CLIENTES_CATALOGO = {
     "CLI001": {
         "id": "CLI001",
         "nombre": "Juan Pérez",
-        "servicio": "Plan Fibra 600 Mbps + Móvil",
-        "telefono": "987-654-321",
-        "periodo": "2026-07",
-        "recibo_actual": 119.90,
+        "servicio": "Fibra 600 Mbps + Móvil 65GB",
+        "plan_actual": "Plan Dúo Fibra 600 Mbps + 1 Línea Móvil",
+        "tipo_servicio": "HOGAR_Y_MOVIL",
+        "telefono_movil": "987654321",
+        "estado_linea_movil": "ACTIVA",
         "recibo_anterior": 89.90,
-        "estado_linea": "Activa - Al día"
+        "recibo_actual": 119.90,
+        "diferencia": 30.00,
+        "motivo_principal": "Instalación de repetidor WiFi",
+        "detalle_variacion": "Cargo único de S/ 30.00 por instalación de repetidor Smart WiFi solicitado en Junio.",
+        "antiguedad": "18 meses",
+        "region": "Lima - San Isidro",
+        "lineas_moviles_activas": 1
     },
     "1000001": {
         "id": "1000001",
         "nombre": "Carlos Mendoza",
         "servicio": "Fibra Óptica 500 Mbps Pro",
-        "telefono": "991-234-567",
-        "periodo": "2026-07",
-        "recibo_actual": 111.90,
-        "recibo_anterior": 111.90,
-        "estado_linea": "Activa - Elegible Movistar Total"
+        "plan_actual": "Trío Clásico 100 Mbps",
+        "tipo_servicio": "SOLO_HOGAR",
+        "telefono_movil": "981234567",
+        "estado_linea_movil": "SIN_MOVIL_ASOCIADO",
+        "recibo_anterior": 129.90,
+        "recibo_actual": 139.90,
+        "diferencia": 10.00,
+        "motivo_principal": "Fin de promoción de descuento",
+        "detalle_variacion": "Vencimiento del 10% de descuento comercial aplicado durante 6 meses.",
+        "antiguedad": "24 meses",
+        "region": "Lima - Miraflores",
+        "lineas_moviles_activas": 0
     },
     "CLI002": {
         "id": "CLI002",
         "nombre": "María Torres",
         "servicio": "Plan Fibra 1000 Mbps",
-        "telefono": "976-543-210",
-        "periodo": "2026-07",
-        "recibo_actual": 129.90,
-        "recibo_anterior": 109.90,
-        "estado_linea": "Activa - Fin Descuento"
+        "plan_actual": "Plan Fibra Gamer 1000 Mbps",
+        "tipo_servicio": "SOLO_HOGAR",
+        "telefono_movil": "993456789",
+        "estado_linea_movil": "ACTIVA",
+        "recibo_anterior": 149.90,
+        "recibo_actual": 179.90,
+        "diferencia": 30.00,
+        "motivo_principal": "Fin de descuento de bienvenida",
+        "detalle_variacion": "Culminación de descuento promocional de bienvenida de S/ 30.00.",
+        "antiguedad": "7 meses",
+        "region": "Lima - Surco",
+        "lineas_moviles_activas": 2
     },
     "CLI004": {
         "id": "CLI004",
         "nombre": "Lucía Ramos",
         "servicio": "Plan Fibra 300 Mbps",
-        "telefono": "955-432-109",
-        "periodo": "2026-07",
-        "recibo_actual": 104.90,
-        "recibo_anterior": 79.90,
-        "estado_linea": "Activa - Prorrateo Alta"
+        "plan_actual": "Dúo Internet 300 Mbps + Fijo",
+        "tipo_servicio": "HOGAR",
+        "telefono_movil": "976543210",
+        "estado_linea_movil": "ACTIVA",
+        "recibo_anterior": 69.90,
+        "recibo_actual": 94.90,
+        "diferencia": 25.00,
+        "motivo_principal": "Prorrateo por alta a mitad de ciclo",
+        "detalle_variacion": "Cobro de días proporcionales por activación el día 12 del ciclo de facturación.",
+        "antiguedad": "1 mes",
+        "region": "Arequipa",
+        "lineas_moviles_activas": 1
     },
     "CLI005": {
         "id": "CLI005",
         "nombre": "Roberto Díaz",
-        "servicio": "Plan Móvil Ilimitado 65GB",
-        "telefono": "944-321-098",
-        "periodo": "2026-07",
-        "recibo_actual": 94.90,
-        "recibo_anterior": 59.90,
-        "estado_linea": "Activa - Cuota Equipo ShEq"
+        "servicio": "Plan Móvil 65GB Ilimitado",
+        "plan_actual": "Plan Móvil Ilimitado 65GB",
+        "tipo_servicio": "MOVIL",
+        "telefono_movil": "965432109",
+        "estado_linea_movil": "ACTIVA",
+        "recibo_anterior": 55.90,
+        "recibo_actual": 90.90,
+        "diferencia": 35.00,
+        "motivo_principal": "Cuota 3/12 de equipo financiado",
+        "detalle_variacion": "Cuota mensual por adquisición financiada de smartphone Samsung Galaxy.",
+        "antiguedad": "14 meses",
+        "region": "Trujillo",
+        "lineas_moviles_activas": 1
     },
     "CLI006": {
         "id": "CLI006",
         "nombre": "Ana Castro",
         "servicio": "Plan Dúo Básico",
-        "telefono": "933-210-987",
-        "periodo": "2026-07",
-        "recibo_actual": 75.50,
-        "recibo_anterior": 65.00,
-        "estado_linea": "Activa - Reconexión"
+        "plan_actual": "Dúo Básico 100 Mbps",
+        "tipo_servicio": "HOGAR",
+        "telefono_movil": "954321098",
+        "estado_linea_movil": "SUSPENDIDA_POR_PAGO",
+        "recibo_anterior": 79.90,
+        "recibo_actual": 90.40,
+        "diferencia": 10.50,
+        "motivo_principal": "Cargo por reconexión morosa (OC1_RECONEXION)",
+        "detalle_variacion": "Cargo por rehabilitación tras suspensión temporal del servicio por pago fuera de fecha.",
+        "antiguedad": "9 meses",
+        "region": "Chiclayo",
+        "lineas_moviles_activas": 1
     }
 }
 
 
 def init_session_state():
-    """
-    Garantiza la inicialización de todas las variables globales de sesión
-    para persistir datos al alternar entre roles o ejecutar re-renders de Streamlit.
-    """
-    # 0. Modo de vista inicial: 'landing' | 'cliente' | 'trabajador'
+    """Inicializa todas las variables de st.session_state con persistencia y memoria conversacional."""
     if "view_mode" not in st.session_state:
         st.session_state.view_mode = "landing"
 
-    # 1. Rol de usuario: 'cliente' | 'trabajador'
     if "user_role" not in st.session_state:
         st.session_state.user_role = "cliente"
 
-    # 2. ID del cliente activo en la sesión
     if "active_client_id" not in st.session_state:
         st.session_state.active_client_id = "CLI001"
 
+    # Diccionario de memorias de chat indexado por ID de cliente
+    if "client_chat_memories" not in st.session_state:
+        st.session_state.client_chat_memories = {}
 
-    # 3. Historial de conversación del Asistente Digital (inicia vacío esperando la consulta del usuario)
+    # Historial de conversación activo (inicia vacío para nuevo chat)
     if "chat_history" not in st.session_state:
-        st.session_state.chat_history = []
+        cur_id = st.session_state.active_client_id
+        st.session_state.chat_history = list(st.session_state.client_chat_memories.get(cur_id, []))
 
-    # 4. Cola de tickets escalados a asesor humano
     if "escalated_tickets" not in st.session_state:
         st.session_state.escalated_tickets = [
             {
@@ -132,21 +171,34 @@ def init_session_state():
             }
         ]
 
-    # 5. Ticket seleccionado en la vista de trabajador
     if "selected_ticket_id" not in st.session_state:
         st.session_state.selected_ticket_id = "TCK-1001"
 
-    # 6. Estado de la solución comercial seleccionada en cliente ('fraccionamiento' | 'movistar_total')
     if "selected_solution_tab" not in st.session_state:
         st.session_state.selected_solution_tab = "fraccionamiento"
 
-    # 7. Cuotas de fraccionamiento seleccionadas (3, 6, 12)
     if "selected_cuotas" not in st.session_state:
         st.session_state.selected_cuotas = 3
 
 
+def switch_active_client(new_client_id: str):
+    """Cambia el cliente activo guardando y restaurando su memoria conversacional individual."""
+    old_id = st.session_state.get("active_client_id", "CLI001")
+    if "client_chat_memories" not in st.session_state:
+        st.session_state.client_chat_memories = {}
+        
+    # Guardar memoria del cliente anterior
+    st.session_state.client_chat_memories[old_id] = list(st.session_state.get("chat_history", []))
+    
+    # Cambiar al nuevo cliente
+    st.session_state.active_client_id = new_client_id
+    
+    # Restaurar memoria del nuevo cliente o iniciar vacía si es nuevo
+    st.session_state.chat_history = list(st.session_state.client_chat_memories.get(new_client_id, []))
+
+
 def add_chat_message(role: str, content: str, metadata: Optional[Dict[str, Any]] = None):
-    """Agrega un mensaje al historial de chat de la sesión."""
+    """Agrega un mensaje al historial de chat de la sesión y sincroniza la memoria del cliente."""
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
     
@@ -159,20 +211,24 @@ def add_chat_message(role: str, content: str, metadata: Optional[Dict[str, Any]]
         "content": content,
         "metadata": meta
     })
+    
+    # Sincronizar memoria del cliente
+    cur_id = st.session_state.get("active_client_id", "CLI001")
+    if "client_chat_memories" not in st.session_state:
+        st.session_state.client_chat_memories = {}
+    st.session_state.client_chat_memories[cur_id] = list(st.session_state.chat_history)
 
 
 def reset_chat():
-    """Reinicia la conversación actual dejándola completamente limpia para iniciar un nuevo chat."""
+    """Reinicia la conversación del cliente actual dejándola completamente limpia."""
     st.session_state.chat_history = []
-
+    cur_id = st.session_state.get("active_client_id", "CLI001")
+    if "client_chat_memories" in st.session_state:
+        st.session_state.client_chat_memories[cur_id] = []
 
 
 def escalate_case_to_human(client_id: str, client_name: str, reason: str) -> str:
-
-    """
-    Transfiere el caso actual a la cola de derivaciones para atención humana.
-    Retorna el ticket_id generado.
-    """
+    """Transfiere el caso actual a la cola de derivaciones para atención humana."""
     if "escalated_tickets" not in st.session_state:
         st.session_state.escalated_tickets = []
 
@@ -194,10 +250,8 @@ def escalate_case_to_human(client_id: str, client_name: str, reason: str) -> str
         "notes": "Derivado automáticamente desde Asistente Digital con contexto completo."
     }
 
-    # Insertar al inicio de la cola
     st.session_state.escalated_tickets.insert(0, nuevo_ticket)
     st.session_state.selected_ticket_id = ticket_id
-
     return ticket_id
 
 

@@ -8,6 +8,7 @@ from state_manager import (
     CLIENTES_CATALOGO,
     add_chat_message,
     reset_chat,
+    switch_active_client,
     get_active_client_data
 )
 from services.gemini_service import get_gemini_response
@@ -40,7 +41,7 @@ def render_cliente_view():
                 st.session_state.view_mode = "landing"
                 st.rerun()
 
-    # Selector de Cliente / Perfil Activo
+    # Selector de Cliente / Perfil Activo con Memoria Conversacional Persistente
     with col_nav_user:
         opciones_usuarios = {
             cid: f"{data['nombre']} ({cid} - {data['servicio']})"
@@ -58,9 +59,9 @@ def render_cliente_view():
             label_visibility="collapsed"
         )
         if selected_user != st.session_state.active_client_id:
-            st.session_state.active_client_id = selected_user
-            reset_chat()
+            switch_active_client(selected_user)
             st.rerun()
+
 
     with col_nav_right:
         col_th, col_nc = st.columns([1.0, 1.4])
