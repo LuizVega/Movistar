@@ -176,15 +176,23 @@ def get_gemini_response(
     recibo_ant = float(client_ctx.get("recibo_anterior", 89.90))
     recibo_act = float(client_ctx.get("recibo_actual", 119.90))
 
+    of = nbo_data.get("oferta_recomendada", {})
+    ben = nbo_data.get("beneficio_economico", {})
+    nombre_mt = of.get("nombre_oferta", "Movistar Total Dúo 200 Mbps + 1 Línea")
+    precio_mt = float(of.get("precio_promocional", 110.40))
+    ahorro_soles = float(ben.get("ahorro_mensual_soles", 29.40))
+
     # Formatear historial
     historial_formateado = []
+
     for h in chat_history[-6:]:
         role_label = "Cliente" if h.get("role") == "user" else "Yara AI"
         historial_formateado.append(f"{role_label}: {h.get('content')}")
     historial_str = "\n".join(historial_formateado) if historial_formateado else "Inicio de conversación."
 
-    tiene_intencion_especifica = any(k in msg_clean for k in ["total", "upgrade", "cambiar", "ahorr", "fraccion", "recibo", "subio", "subió", "por qué", "porque", "cobro", "lucas", "menos", "cuanto", "cuánto", "pago"])
+    tiene_intencion_especifica = any(k in msg_clean for k in ["total", "upgrade", "cambiar", "ahorr", "fraccion", "recibo", "subio", "subió", "por qué", "porque", "cobro", "lucas", "menos", "cuanto", "cuánto", "pago", "mas", "más", "vino", "promo", "diferencia"])
     es_saludo_inicial = len(chat_history) == 0 and not tiene_intencion_especifica and any(msg_clean == s or msg_clean.startswith(s + " ") for s in ["hola", "hi", "hello", "buenas", "oye", "habla", "ey", "buenos dias", "buenas tardes", "buenas noches"])
+
 
     prompt_gemini = f"""
 {YARA_SYSTEM_PROMPT}
@@ -206,7 +214,8 @@ INSTRUCCIONES CLAVE:
 1. Responde en **MÁXIMO 1 O 2 ORACIONES (20 a 30 palabras)**.
 2. Si el cliente pregunta cuánto paga o por qué subió, explícale que su tarifa base es S/ {recibo_ant:.2f} y que los +S/ {monto_var:.2f} corresponden únicamente a '{motivo_var}' por única vez.
 3. Si el cliente pregunta cuánto paga por internet y cuánto por móvil, aclara que su plan base de hogar/móvil es S/ {recibo_ant:.2f} y el repetidor es S/ {monto_var:.2f}.
-4. NO ofrezcas Movistar Total en este mensaje. Limítate a responder exactamente lo que preguntó.
+4. Si el cliente pide explícitamente información de Movistar Total o cambio de plan, dale el precio de S/ {precio_mt:.2f} y el ahorro mensual de S/ {ahorro_soles:.2f}. De lo contrario, NO ofrezcas Movistar Total y limítate a responder lo que preguntó.
+
 """
 
     gemini_key = api_key_override or os.environ.get("GEMINI_API_KEY") or config.GEMINI_API_KEY
@@ -269,9 +278,10 @@ INSTRUCCIONES CLAVE:
     elif any(p in msg_low for p in ["gracias", "listo", "entendido", "ok", "vale", "ya entendi"]):
         resp_text = f"¡De nada, {nombre_cliente}! Recuerda que estamos para ayudarte. ¡Que tengas un excelente día!"
 
-    elif any(p in msg_low for p in ["cambiar plan", "cambiar de plan", "movistar total"]):
-        resp_text = f"Contamos con **Movistar Total** si deseas unificar servicios y evaluar nuevas velocidades. ¿Te gustaría revisarlo?"
+    elif any(p in msg_low for p in ["cambiar plan", "cambiar de plan", "movistar total", "unificar", "upgrade", "ahorro"]):
+        resp_text = f"Puedes migrar a **{nombre_mt}** por solo **S/ {precio_mt:.2f}/mes**, con un ahorro mensual de **S/ {ahorro_soles:.2f}** en tu cuenta."
         action_payload = {"action": "SHOW_UPGRADE_CARD", "nbo": nbo_data}
+
 
     else:
         resp_text = f"Hola {nombre_cliente}, tu plan actual es de **S/ {recibo_ant:.2f}/mes**. ¿Qué detalle deseas revisar?"
