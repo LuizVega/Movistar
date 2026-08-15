@@ -1,7 +1,6 @@
 """
 components/chat_elements.py - Componentes UI de Yara AI Billing Copilot (Apple Minimalist + Movistar Colors)
-Renderiza tarjetas Bento de facturación, marcadores de análisis y botones interactivos de decisión agéntica.
-Los botones ejecutan transacciones reales sobre la base de datos (Órdenes, Fraccionamientos, Pagos y Escalamiento).
+Renderiza tarjetas Bento de facturación, dashboard resumen de cuenta del cliente y botones interactivos de decisión agéntica.
 """
 
 import streamlit as st
@@ -18,17 +17,11 @@ YARA_AVATAR_URL = "https://lh3.googleusercontent.com/aida-public/AB6AXuAK6qFdc2J
 
 
 def format_text_to_html(text: str) -> str:
-    """
-    Convierte sintaxis de texto a HTML limpio garantizando que negritas
-    (<strong>...</strong>) y saltos de línea se rendericen correctamente sin asteriscos.
-    """
+    """Convierte texto a HTML limpio garantizando que negritas y saltos de línea se rendericen bien."""
     if not text:
         return ""
-    # Convertir **texto** a <strong>texto</strong>
     html = re.sub(r"\*\*(.*?)\*\*", r"<strong style='font-weight: 700;'>\1</strong>", text)
-    # Convertir *texto* a <em>texto</em>
     html = re.sub(r"\*(.*?)\*", r"<em>\1</em>", html)
-    # Convertir saltos de línea a <br>
     html = html.replace("\n", "<br>")
     return html
 
@@ -45,7 +38,9 @@ def get_theme_colors() -> Dict[str, str]:
             "text_secondary": "#94a3b8",
             "bg_pill": "#334155",
             "text_pill": "#cbd5e1",
-            "highlight": "#019df4"
+            "highlight": "#019df4",
+            "tag_bg": "#1e3a5f",
+            "tag_text": "#60a5fa"
         }
     else:
         return {
@@ -56,23 +51,25 @@ def get_theme_colors() -> Dict[str, str]:
             "text_secondary": "#64748b",
             "bg_pill": "#f1f5f9",
             "text_pill": "#475569",
-            "highlight": "#00639c"
+            "highlight": "#00639c",
+            "tag_bg": "#e0f2fe",
+            "tag_text": "#0284c7"
         }
 
 
 def render_analysis_markers():
-    """Renderiza la barra de estado de razonamiento de Yara AI (Consultar -> Comprender -> Explicar)."""
+    """Renderiza la barra de estado de razonamiento de Yara AI."""
     theme = get_theme_colors()
     st.markdown(f"""
-    <div style="display: flex; justify-content: center; margin: 8px 0 16px 0;">
-        <div style="display: inline-flex; background: {theme['bg_pill']}; border-radius: 9999px; border: 1px solid {theme['border']}; padding: 3px 5px; gap: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
-            <div style="display: flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 600; color: {theme['text_pill']};">
+    <div style="display: flex; justify-content: center; margin: 4px 0 14px 0;">
+        <div style="display: inline-flex; background: {theme['bg_pill']}; border-radius: 9999px; border: 1px solid {theme['border']}; padding: 3px 6px; gap: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+            <div style="display: flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 600; color: {theme['text_pill']};">
                 <span style="color: #00639c;">✓</span> Consultar
             </div>
-            <div style="display: flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 600; color: {theme['text_pill']};">
+            <div style="display: flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 600; color: {theme['text_pill']};">
                 <span style="color: #00639c;">✓</span> Comprender
             </div>
-            <div style="display: flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 9999px; background: #00639c; font-size: 11px; font-weight: 700; color: #ffffff;">
+            <div style="display: flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 9999px; background: #00639c; font-size: 11px; font-weight: 700; color: #ffffff;">
                 <span>⟳</span> Explicar
             </div>
         </div>
@@ -80,8 +77,54 @@ def render_analysis_markers():
     """, unsafe_allow_html=True)
 
 
+def render_client_dashboard_card(cliente_context: Dict[str, Any]):
+    """
+    Renderiza el mini-dashboard visual de la cuenta al inicio o bienvenida.
+    Muestra de un vistazo: Plan, Recibo actual, Variación, Línea Móvil y Estado.
+    """
+    theme = get_theme_colors()
+    plan = cliente_context.get("plan_actual", "Fibra 200 Mbps")
+    rec_ant = float(cliente_context.get("recibo_anterior", 89.90))
+    rec_act = float(cliente_context.get("recibo_actual", 119.90))
+    delta = rec_act - rec_ant
+    tel = cliente_context.get("telefono_movil", "987654321")
+    estado_linea = cliente_context.get("estado_linea_movil", "ACTIVA")
+    motivo = cliente_context.get("motivo_principal", "Ajuste regular")
+
+    badge_color = "#fee2e2" if delta > 0 else "#dcfce7"
+    badge_text_color = "#b91c1c" if delta > 0 else "#15803d"
+    badge_sign = f"+S/ {delta:.2f}" if delta > 0 else f"S/ {delta:.2f}"
+
+    st.markdown(f"""
+    <div style="background: {theme['bg_card']}; border: 1px solid {theme['border']}; border-radius: 16px; padding: 16px 20px; box-shadow: 0 4px 16px rgba(0,0,0,0.04); max-width: 540px; margin: 8px 0 14px 48px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid {theme['border']}; padding-bottom: 10px;">
+            <div style="font-size: 13px; font-weight: 700; color: {theme['highlight']}; display: flex; align-items: center; gap: 6px;">
+                📊 Estado de tu Cuenta Movistar
+            </div>
+            <span style="background: {badge_color}; color: {badge_text_color}; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 9999px;">
+                {badge_sign} vs Junio
+            </span>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px;">
+            <div style="background: {theme['bg_pill']}; padding: 10px 12px; border-radius: 10px;">
+                <div style="font-size: 10px; font-weight: 600; color: {theme['text_secondary']}; text-transform: uppercase;">Plan Contratado</div>
+                <div style="font-size: 13px; font-weight: 700; color: {theme['text_primary']}; margin-top: 2px;">{plan}</div>
+            </div>
+            <div style="background: {theme['bg_pill']}; padding: 10px 12px; border-radius: 10px;">
+                <div style="font-size: 10px; font-weight: 600; color: {theme['text_secondary']}; text-transform: uppercase;">Recibo Julio 2026</div>
+                <div style="font-size: 16px; font-weight: 800; color: {theme['highlight']}; margin-top: 1px;">S/ {rec_act:.2f}</div>
+            </div>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: {theme['text_secondary']};">
+            <span>📱 Línea: <strong style="color: {theme['text_primary']};">{tel}</strong> ({estado_linea})</span>
+            <span>ℹ️ <strong style="color: {theme['text_primary']};">{motivo}</strong></span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
 def render_bento_billing_card(cliente_context: Dict[str, Any], diff_data: Optional[Dict[str, Any]] = None):
-    """Renderiza la tarjeta Bento de Desglose de Facturación minimalista."""
+    """Renderiza la tarjeta Bento de Desglose de Facturación."""
     theme = get_theme_colors()
     cid = str(cliente_context.get("id", "CLI001")).strip().upper()
     diff = diff_data or auditar_variacion_recibo(cid, "2026-07")
@@ -141,11 +184,15 @@ def render_chat_action_elements(msg: Dict[str, Any], msg_idx: int, client_contex
 
     action_type = action_payload.get("action")
 
-    # 1. Si la acción recomendada es mostrar el Desglose de Facturación
-    if action_type == "SHOW_BILLING_BREAKDOWN":
+    # 1. Si la acción es mostrar el Mini-Dashboard de Inicio
+    if action_type == "SHOW_DASHBOARD":
+        render_client_dashboard_card(client_context)
+
+    # 2. Si la acción recomendada es mostrar el Desglose de Facturación
+    elif action_type == "SHOW_BILLING_BREAKDOWN":
         render_bento_billing_card(client_context)
 
-    # 2. Si la acción recomendada es Propuesta de Movistar Total o Ayuda Comercial
+    # 3. Si la acción recomendada es Propuesta de Movistar Total
     elif action_type in ["SHOW_UPGRADE_CARD", "UPGRADE_MOVISTAR_TOTAL"]:
         nbo_data = action_payload.get("nbo") or generar_next_best_offer(cid)
         of = nbo_data.get("oferta_recomendada", {})
@@ -166,11 +213,11 @@ def render_chat_action_elements(msg: Dict[str, Any], msg_idx: int, client_contex
                     <span style="font-size: 15px; font-weight: 700;">Propuesta de Ahorro Movistar Total</span>
                 </div>
                 <span style="background: #dcfce7; color: #15803d; font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 9999px;">
-                    Ahorras {ahorro_pct:.0f}% (S/ {ahorro_mes:.2f}/mes)
+                    Ahorras S/ {ahorro_mes:.2f}/mes
                 </span>
             </div>
-            <p style="font-size: 13.5px; color: {theme['text_secondary']}; line-height: 1.45; margin: 0 0 10px 0;">
-                Unifica tu internet y línea móvil en <strong style="color: {theme['text_primary']};">{plan_nombre}</strong> ({velocidad} Mbps + {gigas} GB) por solo <strong style="color: {theme['highlight']}; font-size: 16px;">S/ {precio_promo:.2f}/mes</strong>.
+            <p style="font-size: 13px; color: {theme['text_secondary']}; line-height: 1.45; margin: 0 0 10px 0;">
+                Unifica hogar y móvil en <strong style="color: {theme['text_primary']};">{plan_nombre}</strong> ({velocidad} Mbps + {gigas} GB) por solo <strong style="color: {theme['highlight']}; font-size: 15px;">S/ {precio_promo:.2f}/mes</strong>.
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -192,9 +239,9 @@ def render_chat_action_elements(msg: Dict[str, Any], msg_idx: int, client_contex
                         content=(
                             f"🎉 **¡Excelente! Cambio a Movistar Total registrado.**\n\n"
                             f"• **Código de Orden:** `{resultado_orden['orden_id']}`\n"
-                            f"• **Nuevo Plan Unificado:** **{resultado_orden['nuevo_plan']}**\n"
-                            f"• **Nueva Tarifa:** `S/ {resultado_orden['precio_nuevo']:.2f}/mes` (Ahorras S/ {resultado_orden['ahorro_mensual']:.2f} al mes)\n"
-                            f"• **Fecha de Vigencia:** `{resultado_orden['fecha_vigencia']}`."
+                            f"• **Nuevo Plan:** **{resultado_orden['nuevo_plan']}**\n"
+                            f"• **Nueva Tarifa:** `S/ {resultado_orden['precio_nuevo']:.2f}/mes`\n"
+                            f"• **Vigencia:** `{resultado_orden['fecha_vigencia']}`."
                         ),
                         metadata={"type": "CONFIRMACION_UPGRADE", "orden": resultado_orden}
                     )
@@ -206,7 +253,7 @@ def render_chat_action_elements(msg: Dict[str, Any], msg_idx: int, client_contex
                     res_fracc = ejecutar_fraccionamiento_deuda(cid, 6, recibo_actual)
                     add_chat_message(
                         role="assistant",
-                        content=f"🎉 **Fraccionamiento Aprobado.** Tu solicitud `{res_fracc['solicitud_id']}` fue procesada en 6 cuotas fijas de **S/ {res_fracc['monto_cuota']:.2f}/mes al 0.0% de interés**."
+                        content=f"🎉 **Fraccionamiento Aprobado.** Tu solicitud `{res_fracc['solicitud_id']}` fue procesada en 6 cuotas de **S/ {res_fracc['monto_cuota']:.2f}/mes al 0.0% de interés**."
                     )
                     st.rerun()
 
@@ -216,7 +263,7 @@ def render_chat_action_elements(msg: Dict[str, Any], msg_idx: int, client_contex
                     res_pago = ejecutar_pago_recibo(cid, recibo_actual)
                     add_chat_message(
                         role="assistant",
-                        content=f"✅ **Pago Registrado con Éxito.** Transacción `{res_pago['transaccion_id']}` por un importe de **S/ {res_pago['monto_pagado']:.2f}**. Tu recibo de julio se encuentra al día."
+                        content=f"✅ **Pago Registrado.** Transacción `{res_pago['transaccion_id']}` por **S/ {res_pago['monto_pagado']:.2f}**. Tu recibo de julio está al día."
                     )
                     st.rerun()
 
@@ -230,16 +277,16 @@ def render_chat_action_elements(msg: Dict[str, Any], msg_idx: int, client_contex
                     )
                     st.rerun()
         else:
-            st.caption("✅ *Gestión registrada exitosamente en el sistema.*")
+            st.caption("✅ *Gestión registrada exitosamente.*")
 
-    # 3. Si la acción recomendada es Fraccionamiento de Deuda
+    # 4. Si la acción recomendada es Fraccionamiento de Deuda
     elif action_type == "SHOW_INSTALLMENT_MODAL":
         monto_fracc = float(action_payload.get("monto", recibo_actual))
         if not is_executed:
             st.markdown(f"""
             <div style="background: {theme['bg_card']}; border: 1px solid {theme['border']}; border-radius: 16px; padding: 16px 20px; max-width: 520px; margin: 10px 0 10px 48px;">
                 <div style="font-size: 14px; font-weight: 700; color: {theme['highlight']}; margin-bottom: 6px;">💳 Opción de Fraccionamiento al 0.0% TCEA</div>
-                <div style="font-size: 13px; color: {theme['text_secondary']};">¿Deseas diferir tu recibo de S/ {monto_fracc:.2f} en 6 cuotas fijas de S/ {(monto_fracc/6):.2f}/mes sin intereses ni comisiones?</div>
+                <div style="font-size: 13px; color: {theme['text_secondary']};">¿Deseas diferir tu recibo de S/ {monto_fracc:.2f} en 6 cuotas fijas de S/ {(monto_fracc/6):.2f}/mes sin intereses?</div>
             </div>
             """, unsafe_allow_html=True)
             col_f1, col_f2 = st.columns([1.2, 1.2])
@@ -249,7 +296,7 @@ def render_chat_action_elements(msg: Dict[str, Any], msg_idx: int, client_contex
                     res_fracc = ejecutar_fraccionamiento_deuda(cid, 6, monto_fracc)
                     add_chat_message(
                         role="assistant",
-                        content=f"🎉 **Fraccionamiento Aprobado.** Tu solicitud `{res_fracc['solicitud_id']}` fue procesada en 6 cuotas fijas de **S/ {res_fracc['monto_cuota']:.2f}/mes al 0.0% de interés**."
+                        content=f"🎉 **Fraccionamiento Aprobado.** Tu solicitud `{res_fracc['solicitud_id']}` fue procesada en 6 cuotas de **S/ {res_fracc['monto_cuota']:.2f}/mes**."
                     )
                     st.rerun()
             with col_f2:
@@ -257,7 +304,7 @@ def render_chat_action_elements(msg: Dict[str, Any], msg_idx: int, client_contex
                     st.session_state[action_executed_key] = True
                     st.rerun()
 
-    # 4. Botones puntuales recomendados por el agente
+    # 5. Botones individuales recomendados
     elif action_payload.get("show_action_buttons"):
         btns = action_payload.get("show_action_buttons", [])
         if not is_executed:
@@ -269,7 +316,7 @@ def render_chat_action_elements(msg: Dict[str, Any], msg_idx: int, client_contex
                         res_pago = ejecutar_pago_recibo(cid, recibo_actual)
                         add_chat_message(
                             role="assistant",
-                            content=f"✅ **Pago Registrado con Éxito.** Transacción `{res_pago['transaccion_id']}` por un importe de **S/ {res_pago['monto_pagado']:.2f}**. Tu recibo se encuentra al día."
+                            content=f"✅ **Pago Registrado.** Transacción `{res_pago['transaccion_id']}` por **S/ {res_pago['monto_pagado']:.2f}**."
                         )
                         st.rerun()
                     elif b_type == "CAMBIAR_PLAN" and st.button("🚀 Cambiar de Plan", key=f"btn_c_rec_{msg_idx}", type="primary", use_container_width=True):
@@ -286,6 +333,6 @@ def render_chat_action_elements(msg: Dict[str, Any], msg_idx: int, client_contex
                         ticket = escalar_a_humano(cid, st.session_state.get("chat_history", []), "Cliente solicita asesor humano")
                         add_chat_message(
                             role="assistant",
-                            content=f"🔔 **He transferido tu caso a un asesor.** Ticket de atención: **`{ticket['ticket_id']}`**."
+                            content=f"🔔 **He transferido tu caso a un asesor.** Ticket: **`{ticket['ticket_id']}`**."
                         )
                         st.rerun()
