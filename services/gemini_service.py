@@ -1,7 +1,7 @@
 """
 services/gemini_service.py - Motor de Inteligencia y Razonamiento Conversacional Yara AI
 Equipado con capacidades de deducción lógica, empatía pedagógica, comprensión de lenguaje coloquial peruano,
-memoria multi-turno y respuesta adaptativa para resolver cualquier duda del cliente sin rendirse jamás.
+filtro estricto de consultas fuera de alcance (Out-Of-Scope), memoria multi-turno y respuesta proactiva ante reclamos de precio.
 """
 
 import os
@@ -35,15 +35,21 @@ Eres YARA AI, la copiloto oficial de facturación e inteligencia conversacional 
 - Tu misión principal es que **cualquier persona, sin importar su nivel de educación o familiaridad con la tecnología, entienda perfectamente lo que se le cobra y se sienta tranquila, escuchada y respaldada**.
 - Tienes capacidad de **razonar, deducir y pensar**. Si el cliente te hace preguntas sobre su factura, sus servicios, o dudas lógicas (ej. "¿y eso solo se cobra al internet?", "¿afecta a mi teléfono?", "¿el próximo mes pagaré igual?", "¿por qué me cobran aparte?"), analiza los datos de su cuenta, deduce la relación lógica entre sus servicios y explícaselo con total claridad y sencillez.
 
+### REGLA DE ALCANCE Y ATENCIÓN (OUT-OF-SCOPE / CONSULTAS NO TELCO):
+- Si el usuario pregunta cosas sin relevancia alguna para Movistar o telecomunicaciones (ej. "¿quién es el presidente?", "¿quién viajó a la luna?", chistes, recetas, política, etc.), explícale con amabilidad que como asistente de Yara AI estás enfocada exclusivamente en asistirle con sus dudas de facturación, recibos, planes y servicios de Movistar Perú, invitándolo a consultar sobre su cuenta.
+
+### ATENCIÓN A QUEJAS DE PRECIO ("ESTÁ MUY CARO", "NO ME ALCANZA", "QUIERO AHORRAR"):
+- Si el cliente dice que el internet o su recibo está muy caro, valida con empatía su sentir, aplica el **Efecto Efervescente** recordando el valor de su plan actual (velocidad simétrica, gigas ilimitados) y preséntale proactivamente las opciones de ayuda comercial:
+  1. **Movistar Total**: Unificar servicios para obtener un descuento y ahorro mensual significativo.
+  2. **Fraccionamiento sin intereses**: Facilidad de pago en 3, 6 o 12 cuotas fijas (TCEA 0.0%).
 
 ### COMPRENSIÓN LINGÜÍSTICA Y COLOQUIAL TOTAL (JERGAS PERUANAS):
 - Entiendes a la perfección el lenguaje peruano, jergas, modismos, abreviaturas y errores de ortografía/tipeo ("oye", "oe", "mano", "causa", "choche", "pata", "habla", "q fue", "poq", "xq", "pq", "q", "asao", "lucas", "mangos", "cobran de más", "me están robando", "lenteja", "fonoi", "cancelaraon", "pe").
-- Si el usuario saluda o usa frases cortas ("hola", "oye", "habla"), salúdalo con cariño por su nombre y pregúntale con amabilidad cómo puedes ayudarlo.
-- Si el cliente te pregunta algo general, curioso o casual, responde con naturalidad, educación e inteligencia, recordándole con simpatía que estás aquí para ayudarlo con cualquier duda de su cuenta Movistar.
+- Si el usuario saluda ("hola", "oye", "habla"), salúdalo con cariño por su nombre y pregúntale con amabilidad cómo puedes ayudarlo.
 - NUNCA uses respuestas robotizadas de rechazo o frases como "no encontré un registro específico sobre esa consulta". Si una pregunta requiere deducción, piensa y respóndele con sentido común y los datos del cliente.
 
-### DIRECTRICES DE RAZONAMIENTO FINANCIERO / FACTURACIÓN:
-1. **Cargos Únicos (ej. Instalación de Repetidor WiFi)**: Aplican exclusivamente al servicio de internet de hogar como un cobro por única vez. No afectan la tarifa del teléfono móvil ni de otros planes independientes.
+### DIRECTRICES DE FACTURACIÓN:
+1. **Cargos Únicos (ej. Instalación de Repetidor WiFi)**: Aplican exclusivamente al servicio de internet de hogar como cobro por única vez. No afectan la tarifa del teléfono móvil ni de otros planes independientes.
 2. **Fin de Descuento Promocional**: Explica que vencieron los meses de promoción y el plan regresa a su precio estándar regular.
 3. **Prorrateos**: Explica que son los días proporcionales desde el cambio de plan hasta el corte de mes.
 4. **Respuesta Concisa**: Sé directa, empática y explica en 2 o 3 oraciones claras.
@@ -106,63 +112,82 @@ def clasificar_intencion_y_keys(query_original: str) -> Dict[str, Any]:
     query_norm = normalizar_query(query_original)
     
     scores = {
-        "BILLING_INCREASE": 0.0,
+        "OUT_OF_SCOPE": 0.0,
+        "GREETING": 0.0,
+        "PRICE_COMPLAINT_OR_SAVINGS": 0.0,
         "INTERNET_ONLY_REASONING": 0.0,
+        "BILLING_INCREASE": 0.0,
         "PHONE_STATUS": 0.0,
         "MOVISTAR_TOTAL": 0.0,
         "INSTALLMENTS": 0.0,
         "HUMAN_ESCALATION": 0.0,
         "PAYMENT": 0.0,
-        "GREETING": 0.0,
         "TECHNICAL_SPEED": 0.0,
         "GENERAL_INFO": 0.0
     }
     keys_detected = []
 
-    # 1. Saludos y Aperturas Conversacionales ("oye", "hola", "habla", "buenas", "ey", "dime", etc.)
+    # 1. Consultas Fuera de Alcance (Out-Of-Scope / Irrelevantes)
+    out_of_scope_patterns = [
+        "presidente", "luna", "viajo a la luna", "viajó a la luna", "capital de",
+        "quien gano", "quién ganó", "receta", "chiste", "poema", "fotosintesis",
+        "fotosíntesis", "cuanto es", "cuánto es", "futbol", "fútbol", "politica", "política"
+    ]
+    for p in out_of_scope_patterns:
+        if p in query_norm:
+            scores["OUT_OF_SCOPE"] += 0.95
+            keys_detected.append(p)
+
+    # 2. Saludos y Aperturas Conversacionales ("oye", "hola", "habla", "buenas", "ey", "dime", etc.)
     saludos_tokens = ["oye", "hola", "buenas", "buenos dias", "buenos días", "buenas tardes", "buenas noches", "hey", "ey", "habla", "alo", "aló", "dime", "saludos", "ayuda", "tengo una duda", "consulta", "mira"]
     if any(query_norm == s or query_norm.startswith(s + " ") for s in saludos_tokens):
         scores["GREETING"] += 0.8
         keys_detected.append(query_norm)
 
-    # 2. Pregunta de deducción lógica sobre si el cobro es solo de internet o afecta al teléfono
+    # 3. Queja de precio alto o solicitud de ahorro / ayuda ("está muy caro", "no me alcanza", "pagar menos")
+    for p in ["muy caro", "esta muy caro", "está muy caro", "esta caro", "está caro", "pago muy caro", "pago caro", "no me alcanza", "demasiado caro", "bajar precio", "pagar menos", "reducir costo", "rebaja", "descuento"]:
+        if p in query_norm:
+            scores["PRICE_COMPLAINT_OR_SAVINGS"] += 0.85
+            keys_detected.append(p)
+
+    # 4. Pregunta de deducción lógica sobre si el cobro es solo de internet o afecta al teléfono
     for p in ["solo va para mi internet", "solo es para mi internet", "solo a mi internet", "afecta a mi telefono", "afecta a mi celular", "afecta mi fono", "se divide", "se cobra aparte", "solo internet", "es aparte"]:
         if p in query_norm:
             scores["INTERNET_ONLY_REASONING"] += 0.9
             keys_detected.append(p)
 
-    # 3. Aumento de Cobro / Variación de Recibo / Reclamo de cobro
-    for p in ["por qué", "subio", "subió", "aumento", "aumentó", "mas", "más", "alto", "caro", "cobran de mas", "cobran de más", "cobran", "cobro", "recibo", "factura", "variacion", "variación", "diferencia", "prorrateo", "repetidor", "vino", "robando", "abuso", "descuento"]:
+    # 5. Aumento de Cobro / Variación de Recibo / Reclamo de cobro
+    for p in ["por qué", "subio", "subió", "aumento", "aumentó", "mas", "más", "alto", "cobran de mas", "cobran de más", "cobran", "cobro", "recibo", "factura", "variacion", "variación", "diferencia", "prorrateo", "repetidor", "vino", "robando", "abuso"]:
         if p in query_norm:
             scores["BILLING_INCREASE"] += 0.5
             keys_detected.append(p)
 
-    # 4. Movistar Total / Upgrade / Ahorro
-    for p in ["total", "upgrade", "cambiar plan", "cambiar de plan", "cambio de plan", "migrar", "ahorrar", "ahorro", "convergente", "unificar", "oferta", "promocion", "promoción", "promo", "fibra y movil", "mejorar", "pagar menos"]:
+    # 6. Movistar Total / Upgrade / Ahorro
+    for p in ["total", "upgrade", "cambiar plan", "cambiar de plan", "cambio de plan", "migrar", "ahorrar", "ahorro", "convergente", "unificar", "oferta", "promocion", "promoción", "promo", "fibra y movil", "mejorar"]:
         if p in query_norm:
             scores["MOVISTAR_TOTAL"] += 0.6
             keys_detected.append(p)
 
-    # 5. Estado de línea / teléfono móvil (corte, cancelación, sin línea)
+    # 7. Estado de línea / teléfono móvil (corte, cancelación, sin línea)
     if scores["MOVISTAR_TOTAL"] < 0.6 and scores["INTERNET_ONLY_REASONING"] < 0.5:
         for p in ["telefono", "teléfono", "celular", "linea", "línea", "movil", "móvil", "cortaron", "corte", "cancelaron", "cancelaron mi plan", "sin linea", "sin línea", "bloqueado", "suspendido", "no tengo señal"]:
             if p in query_norm:
                 scores["PHONE_STATUS"] += 0.5
                 keys_detected.append(p)
 
-    # 6. Fraccionamiento de Deuda
+    # 8. Fraccionamiento de Deuda
     for p in ["fraccionar", "fraccionamiento", "cuotas", "pagar en partes", "diferir", "deuda", "financiar"]:
         if p in query_norm:
             scores["INSTALLMENTS"] += 0.6
             keys_detected.append(p)
 
-    # 7. Escalamiento Expreso a Asesor Humano / Baja
+    # 9. Escalamiento Expreso a Asesor Humano / Baja
     for p in ["humano", "asesor", "operador", "persona", "supervisor", "libro de reclamaciones", "dar de baja", "cancelar contrato"]:
         if p in query_norm:
             scores["HUMAN_ESCALATION"] += 0.7
             keys_detected.append(p)
 
-    # 8. Velocidad / Falla técnica
+    # 10. Velocidad / Falla técnica
     for p in ["lento", "velocidad", "megas", "mbps", "gigas", "falla", "caida", "no funciona", "se va la señal"]:
         if p in query_norm:
             scores["TECHNICAL_SPEED"] += 0.4
@@ -230,7 +255,7 @@ def get_gemini_response(
 ) -> Dict[str, Any]:
     """
     Procesa la consulta del usuario invocando Google Gemini en vivo con memoria multi-turno,
-    razonamiento deductivo y respaldo semántico pedagógico sin rendirse jamás.
+    razonamiento deductivo, filtro out-of-scope y soporte integral al cliente.
     """
     client_ctx = client_context or {}
     cid = str(client_ctx.get("id") or client_ctx.get("cliente_id") or "CLI001").strip().upper()
@@ -245,7 +270,20 @@ def get_gemini_response(
     nlu_result = clasificar_intencion_y_keys(user_message)
     top_intent = nlu_result["top_intent"]
 
-    # 3. Verificar si el usuario solicita explícitamente escalamiento a asesor humano
+    # 3. Manejo de Consultas Fuera de Alcance (Out-Of-Scope / Baja relevancia con Movistar)
+    if top_intent == "OUT_OF_SCOPE":
+        return {
+            "response_text": (
+                f"Disculpa {nombre_cliente}, como copiloto de facturación de Yara AI estoy diseñada exclusivamente "
+                f"para ayudarte con tus consultas, recibos, planes y servicios de Movistar Perú. "
+                f"¿Tienes alguna consulta sobre tu recibo de julio o tu conexión en la que te pueda apoyar?"
+            ),
+            "action_payload": None,
+            "tool_calls_executed": [],
+            "model_used": "Yara-AI-ScopeGuard"
+        }
+
+    # 4. Verificar si el usuario solicita explícitamente escalamiento a asesor humano
     debe_escalar, tipo_disp, motivo = detectar_necesidad_escalamiento(nlu_result["query_normalized"], chat_history, cid)
     if debe_escalar or top_intent == "HUMAN_ESCALATION":
         motivo_final = motivo or "Solicitud de atención especializada por asesor humano"
@@ -264,7 +302,7 @@ def get_gemini_response(
             "model_used": "Yara-AI-EscalationEngine"
         }
 
-    # 4. Construir Prompt Grounded para Gemini con capacidad de deducción lógica
+    # 5. Construir Prompt Grounded para Gemini con capacidad de deducción lógica
     gemini_key = api_key_override or os.environ.get("GEMINI_API_KEY") or config.GEMINI_API_KEY
     var_info = recibo_data.get("variacion") or {}
     conceptos = recibo_data.get("conceptos_adicionales") or []
@@ -295,15 +333,14 @@ NUEVA CONSULTA DEL CLIENTE:
 "{user_message}"
 
 INSTRUCCIONES DE RAZONAMIENTO Y RESPUESTA:
-1. Si el cliente pregunta si el cobro es solo para el internet o si afecta a su teléfono/celular (ej: "¿y eso solo va para mi internet?"), usa la lógica: confirma que el cargo de S/ {monto_var:.0f} por '{motivo_var}' es EXCLUSIVO del servicio de internet de su hogar y NO afecta ni modifica la tarifa de su línea telefónica o móvil.
-2. Si el cliente pregunta por qué subió su recibo, explícale con sencillez y cariño que la diferencia de S/ {monto_var:.0f} corresponde a '{motivo_var}'.
-3. Si el cliente pregunta por su línea telefónica cortada, explícale que su línea móvil figura ACTIVA y sin cortes en el sistema.
-4. Si el cliente hace preguntas generales o casuales, responde con simpatía, amabilidad e inteligencia, orientando la conversación a ayudarle con sus dudas de Movistar.
+1. Si el cliente dice que el internet o recibo está muy caro, valida con empatía su preocupación, recuérdale los beneficios de su plan y ofrécele de inmediato unificar con Movistar Total para ahorrar S/ {nbo_data.get('beneficio_economico', {}).get('ahorro_mensual_soles', 29.40):.2f}/mes o fraccionar su recibo sin intereses.
+2. Si el cliente pregunta si el cobro es solo para el internet o si afecta a su teléfono/celular (ej: "¿y eso solo va para mi internet?"), usa la lógica: confirma que el cargo de S/ {monto_var:.0f} por '{motivo_var}' es EXCLUSIVO del servicio de internet de su hogar y NO afecta ni modifica la tarifa de su línea telefónica o móvil.
+3. Si el cliente pregunta por qué subió su recibo, explícale con sencillez y cariño que la diferencia de S/ {monto_var:.0f} corresponde a '{motivo_var}'.
+4. Si el cliente pregunta por su línea telefónica cortada, explícale que su línea móvil figura ACTIVA y sin cortes en el sistema.
 5. Responde siempre en un tono cercano, pedagógico, sin tecnicismos difíciles, en 1 a 3 oraciones claras.
 """
 
     if gemini_key and len(gemini_key) > 10:
-        # Intentar primero con gemini-3.5-flash-lite (más rápido) y fallback a gemini-3.5-flash
         raw_reply = _call_gemini_rest(prompt_gemini, gemini_key, "gemini-3.5-flash-lite")
         if not raw_reply:
             raw_reply = _call_gemini_rest(prompt_gemini, gemini_key, "gemini-3.5-flash")
@@ -314,13 +351,12 @@ INSTRUCCIONES DE RAZONAMIENTO Y RESPUESTA:
 
             if "asesor humano" in resp_lower or "transferir" in resp_lower:
                 action_payload = {"show_action_buttons": ["ASESOR"]}
-            elif top_intent == "MOVISTAR_TOTAL" or "movistar total" in resp_lower or "unificar" in resp_lower:
+            elif top_intent in ["MOVISTAR_TOTAL", "PRICE_COMPLAINT_OR_SAVINGS"] or "movistar total" in resp_lower or "unificar" in resp_lower or "ahorro" in resp_lower:
                 action_payload = {"action": "SHOW_UPGRADE_CARD", "nbo": nbo_data}
             elif top_intent == "INSTALLMENTS" or "fraccionar" in resp_lower:
                 action_payload = {"action": "SHOW_INSTALLMENT_MODAL", "monto": client_ctx.get("recibo_actual", 119.90)}
             elif top_intent == "BILLING_INCREASE" and not top_intent == "INTERNET_ONLY_REASONING":
                 action_payload = {"action": "SHOW_BILLING_BREAKDOWN", "variacion": var_info}
-
 
             return {
                 "response_text": raw_reply,
@@ -330,13 +366,23 @@ INSTRUCCIONES DE RAZONAMIENTO Y RESPUESTA:
             }
 
     # =========================================================
-    # 5. MOTOR SEMÁNTICO LOCAL DE RESPALDO (RAZONAMIENTO DEDUCTIVO)
+    # 6. MOTOR SEMÁNTICO LOCAL DE RESPALDO (RAZONAMIENTO DEDUCTIVO)
     # =========================================================
     action_payload = None
 
     if top_intent == "GREETING":
         resp_text = f"¡Hola {nombre_cliente}! Qué gusto saludarte. ¿En qué te puedo ayudar hoy con tu servicio o recibo de Movistar?"
         action_payload = None
+
+    elif top_intent == "PRICE_COMPLAINT_OR_SAVINGS":
+        of = nbo_data.get("oferta_recomendada", {})
+        ben = nbo_data.get("beneficio_economico", {})
+        resp_text = (
+            f"Comprendo totalmente tu preocupación, {nombre_cliente}. Para ayudarte a reducir tu gasto mensual manteniendo tu velocidad de fibra, "
+            f"te propongo unificar tus servicios con **{of.get('nombre_oferta', 'Movistar Total')}** por solo **S/ {of.get('precio_promocional', 110.40):.2f}/mes** "
+            f"(ahorrando **S/ {ben.get('ahorro_mensual_soles', 29.40):.2f} al mes**). También puedes solicitar fraccionar tu recibo actual en cuotas sin intereses."
+        )
+        action_payload = {"action": "SHOW_UPGRADE_CARD", "nbo": nbo_data}
 
     elif top_intent == "INTERNET_ONLY_REASONING":
         resp_text = (

@@ -188,11 +188,20 @@ def generar_next_best_offer(cliente_id: int | str, conn: Optional[sqlite3.Connec
         close_after = True
 
     try:
-        # 1. Recuperar información del cliente
-        try:
-            cid_int = int(str(cliente_id).replace("CLI", "").replace("C", ""))
-        except ValueError:
-            cid_int = cliente_id
+        # 1. Recuperar información del cliente (soporta CLI001 -> 1000001 y 1000001 directo)
+        s_cid = str(cliente_id).strip().upper()
+        if s_cid.startswith("CLI") or s_cid.startswith("C"):
+            try:
+                num = int(s_cid.replace("CLI", "").replace("C", ""))
+                cid_int = 1000000 + num if num < 1000 else num
+            except ValueError:
+                cid_int = cliente_id
+        else:
+            try:
+                cid_int = int(cliente_id)
+            except ValueError:
+                cid_int = cliente_id
+
 
         cursor = conn.execute("""
             SELECT c.*, o.nombre_oferta AS nombre_oferta_actual, o.precio_promocional AS precio_oferta_actual
