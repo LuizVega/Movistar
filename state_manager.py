@@ -78,6 +78,10 @@ def init_session_state():
     Garantiza la inicialización de todas las variables globales de sesión
     para persistir datos al alternar entre roles o ejecutar re-renders de Streamlit.
     """
+    # 0. Modo de vista inicial: 'landing' | 'cliente' | 'trabajador'
+    if "view_mode" not in st.session_state:
+        st.session_state.view_mode = "landing"
+
     # 1. Rol de usuario: 'cliente' | 'trabajador'
     if "user_role" not in st.session_state:
         st.session_state.user_role = "cliente"
@@ -85,6 +89,7 @@ def init_session_state():
     # 2. ID del cliente activo en la sesión
     if "active_client_id" not in st.session_state:
         st.session_state.active_client_id = "CLI001"
+
 
     # 3. Historial de conversación del Asistente Digital
     if "chat_history" not in st.session_state:
@@ -162,7 +167,19 @@ def add_chat_message(role: str, content: str, metadata: Optional[Dict[str, Any]]
     })
 
 
+def reset_chat():
+    """Reinicia la conversación actual con el saludo inicial de Yara AI."""
+    st.session_state.chat_history = [
+        {
+            "role": "assistant",
+            "content": "¡Hola! Soy **Yara AI**, tu copiloto inteligente de facturación de Movistar Perú. He auditado tu recibo de Julio 2026. ¿En qué puedo ayudarte hoy?",
+            "metadata": {"timestamp": datetime.now().strftime("%H:%M")}
+        }
+    ]
+
+
 def escalate_case_to_human(client_id: str, client_name: str, reason: str) -> str:
+
     """
     Transfiere el caso actual a la cola de derivaciones para atención humana.
     Retorna el ticket_id generado.
