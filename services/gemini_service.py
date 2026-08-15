@@ -46,7 +46,8 @@ Eres YARA AI, la copiloto oficial de facturación e inteligencia conversacional 
 ### COMPRENSIÓN LINGÜÍSTICA Y COLOQUIAL TOTAL (JERGAS PERUANAS):
 - Entiendes a la perfección el lenguaje peruano, jergas, modismos, abreviaturas y errores de ortografía/tipeo ("oye", "oe", "mano", "causa", "choche", "pata", "habla", "q fue", "poq", "xq", "pq", "q", "asao", "lucas", "mangos", "cobran de más", "me están robando", "lenteja", "fonoi", "cancelaraon", "pe").
 - Si el usuario saluda ("hola", "oye", "habla"), salúdalo con cariño por su nombre y pregúntale con amabilidad cómo puedes ayudarlo.
-- NUNCA uses respuestas robotizadas de rechazo o frases como "no encontré un registro específico sobre esa consulta". Si una pregunta requiere deducción, piensa y respóndele con sentido común y los datos del cliente.
+- Explica y responde con claridad, sentido común y empatía humana basándote en los datos del cliente.
+
 
 ### DIRECTRICES DE FACTURACIÓN:
 1. **Cargos Únicos (ej. Instalación de Repetidor WiFi)**: Aplican exclusivamente al servicio de internet de hogar como cobro por única vez. No afectan la tarifa del teléfono móvil ni de otros planes independientes.
@@ -127,16 +128,37 @@ def clasificar_intencion_y_keys(query_original: str) -> Dict[str, Any]:
     }
     keys_detected = []
 
-    # 1. Consultas Fuera de Alcance (Out-Of-Scope / Irrelevantes)
+    # 1. Escalamiento Expreso a Asesor Humano / Reclamos
+    for p in ["humano", "asesor", "operador", "persona", "supervisor", "libro de reclamaciones", "dar de baja", "cancelar contrato", "comunicarme", "transferir"]:
+        if p in query_norm:
+            scores["HUMAN_ESCALATION"] += 0.85
+            keys_detected.append(p)
+
+    # 2. Consultas Fuera de Alcance (Out-Of-Scope / Irrelevantes con baja atención)
     out_of_scope_patterns = [
         "presidente", "luna", "viajo a la luna", "viajó a la luna", "capital de",
         "quien gano", "quién ganó", "receta", "chiste", "poema", "fotosintesis",
-        "fotosíntesis", "cuanto es", "cuánto es", "futbol", "fútbol", "politica", "política"
+        "fotosíntesis", "cuanto es", "cuánto es", "futbol", "fútbol", "politica", "política",
+        "quien es", "quién es", "quien fue", "quién fue", "como se hace", "cómo se hace",
+        "clima", "tiempo de hoy", "pelicula", "película", "musica", "música"
     ]
+    tiene_keywords_telco = any(k in query_norm for k in [
+        "movistar", "recibo", "factura", "internet", "fibra", "movil", "móvil", "linea", "línea",
+        "plan", "celular", "cobro", "pago", "descuento", "deuda", "fraccionar", "cuota", "router",
+        "wifi", "mbps", "gigas", "saldo", "baja", "corte", "repetidor", "total", "upgrade", "promo",
+        "costo", "tarifa", "subio", "subió", "caro", "ayuda", "hola", "oye", "habla", "buenas", "que tal",
+        "asesor", "humano", "operador", "reclamo", "soporte", "atencion", "atención", "ticket"
+    ])
+    
     for p in out_of_scope_patterns:
-        if p in query_norm:
+        if p in query_norm and not tiene_keywords_telco:
             scores["OUT_OF_SCOPE"] += 0.95
             keys_detected.append(p)
+
+    if not tiene_keywords_telco and len(query_norm.split()) >= 3 and not scores["OUT_OF_SCOPE"] and not scores["HUMAN_ESCALATION"]:
+        scores["OUT_OF_SCOPE"] += 0.8
+
+
 
     # 2. Saludos y Aperturas Conversacionales ("oye", "hola", "habla", "buenas", "ey", "dime", etc.)
     saludos_tokens = ["oye", "hola", "buenas", "buenos dias", "buenos días", "buenas tardes", "buenas noches", "hey", "ey", "habla", "alo", "aló", "dime", "saludos", "ayuda", "tengo una duda", "consulta", "mira"]

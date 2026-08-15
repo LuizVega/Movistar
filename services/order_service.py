@@ -219,6 +219,56 @@ def ejecutar_fraccionamiento_deuda(
     }
 
 
+def ejecutar_pago_recibo(
+    cliente_id: str,
+    monto: float = 119.90,
+    metodo_pago: str = "PASARELA_DIGITAL_MOVISTAR",
+    canal: str = "YARA_AI"
+) -> Dict[str, Any]:
+    """
+    Procesa y registra el pago inmediato del recibo del cliente a través de la pasarela digital.
+    """
+    cid = str(cliente_id).strip().upper()
+    orden_id = generar_id_orden("PAG")
+    fechas = calcular_fechas_ciclo()
+
+    cliente_meta = CLIENTES_CATALOGO.get(cid, {"nombre": f"Cliente {cid}"})
+
+    orden_data = {
+        "orden_id": orden_id,
+        "cliente_id": cid,
+        "tipo_orden": "PAGO_RECIBO_INMEDIATO",
+        "plan_anterior": f"Recibo Pendiente S/ {monto:.2f}",
+        "nuevo_plan_id": None,
+        "nombre_plan": f"Pago de Recibo Mensual S/ {monto:.2f} ({metodo_pago})",
+        "monto_nuevo": monto,
+        "ahorro_mensual": 0.0,
+        "fecha_registro": fechas["fecha_registro"],
+        "fecha_vigencia": fechas["fecha_registro"],
+        "canal": canal,
+        "estado": "PAGADO_EXITOSO"
+    }
+    insert_orden_comercial(orden_data)
+
+    registrar_en_ordenes_csv(
+        cliente_id=cid,
+        motivo_desc=f"Pago de recibo S/ {monto:.2f} vía {metodo_pago}",
+        item_tipo="Pago Recibo"
+    )
+
+    return {
+        "exito": True,
+        "transaccion_id": orden_id,
+        "cliente_id": cid,
+        "cliente_nombre": cliente_meta["nombre"],
+        "monto_pagado": monto,
+        "metodo_pago": metodo_pago,
+        "fecha_pago": fechas["fecha_registro"],
+        "estado": "PAGADO_EXITOSO"
+    }
+
+
 def consultar_ordenes_cliente(cliente_id: str) -> List[Dict[str, Any]]:
     """Consulta todas las órdenes registradas de un cliente."""
     return get_ordenes_por_cliente(cliente_id)
+

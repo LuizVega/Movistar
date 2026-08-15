@@ -244,13 +244,14 @@ def generar_next_best_offer(cliente_id: int | str, conn: Optional[sqlite3.Connec
             # ESTRATEGIA PRINCIPAL: BLINDAJE CONVERGENTE MOVISTAR TOTAL
             oferta_seleccionada = seleccionar_variante_optima_mt(cliente, ofertas_mt)
             
-            # Cálculo del beneficio económico
+            # Cálculo del beneficio económico dinámico y numérico
             gasto_fragmentado = estimar_gasto_fragmentado(cliente, oferta_seleccionada)
-            precio_mt_promo = float(oferta_seleccionada["precio_promocional"])
-            precio_mt_regular = float(oferta_seleccionada["cargo_fijo"])
+            precio_mt_promo = float(oferta_seleccionada.get("precio_promocional", 110.40))
+            precio_mt_regular = float(oferta_seleccionada.get("cargo_fijo", 139.90))
+
 
             ahorro_mensual = round(max(gasto_fragmentado - precio_mt_promo, 0.0), 2)
-            ahorro_pct = round((ahorro_mensual / gasto_fragmentado) * 100.0, 2) if gasto_fragmentado > 0 else 0.0
+            ahorro_pct = round((ahorro_mensual / gasto_fragmentado) * 100.0, 1) if gasto_fragmentado > 0 else 0.0
             ahorro_anual = round(ahorro_mensual * 12, 2)
 
             # Canal y Propensión
@@ -260,12 +261,13 @@ def generar_next_best_offer(cliente_id: int | str, conn: Optional[sqlite3.Connec
             # Motivos de recomendación estructurados
             motivos = [
                 f"Cliente elegible para convergencia Movistar Total como palanca de blindaje.",
-                f"Ahorro económico del {ahorro_pct}% (S/ {ahorro_mensual:.2f} al mes) respecto al gasto en servicios fragmentados.",
+                f"Ahorro económico del {ahorro_pct}% (S/ {ahorro_mensual:.2f} al mes) respecto a su gasto actual de S/ {gasto_fragmentado:.2f}.",
                 f"Unificación de recibo de internet fibra ({oferta_seleccionada.get('velocidad_mbps')} Mbps) + telefonía móvil ({oferta_seleccionada.get('gigas_datos')} GB).",
                 f"Canal óptimo sugerido: {canal_optimo} basado en afinidad y respuesta del cliente."
             ]
             if sin_historial_monto:
                 motivos.append("Nota: Perfil sin historial previo de facturación; se calculó el beneficio en base al consumo base estimado.")
+
 
             return {
                 "encontrado": True,
