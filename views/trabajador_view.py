@@ -45,11 +45,20 @@ def render_trabajador_view():
         """, unsafe_allow_html=True)
 
     with col_nav_right:
-        st.markdown("""
-        <div style="text-align: right; font-size: 12px; color: #64748b; padding-top: 6px;">
-            Asesor: <strong style="color: #0a2540;">Carlos Vega</strong> (Senior)
-        </div>
-        """, unsafe_allow_html=True)
+        col_w_th, col_w_user = st.columns([0.6, 1.4])
+        with col_w_th:
+            is_dark = st.session_state.get("theme_mode", "light") == "dark"
+            theme_icon = "🌙" if not is_dark else "☀️"
+            if st.button(theme_icon, key="btn_toggle_theme_worker", help="Modo Claro / Oscuro"):
+                st.session_state.theme_mode = "dark" if not is_dark else "light"
+                st.rerun()
+        with col_w_user:
+            st.markdown("""
+            <div style="text-align: right; font-size: 12px; color: #64748b; padding-top: 6px;">
+                Asesor: <strong style="color: #00639c;">Carlos Vega</strong>
+            </div>
+            """, unsafe_allow_html=True)
+
 
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 
