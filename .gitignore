@@ -20,7 +20,13 @@ env/
 venv/
 ENV/
 
+# Variables de entorno y secretos locales
+.env
+.env.local
+.env.*.local
+
 # Logs y Archivos temporales del SO
 *.log
 .DS_Store
 Thumbs.db
+

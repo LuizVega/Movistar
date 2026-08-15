@@ -91,15 +91,9 @@ def init_session_state():
         st.session_state.active_client_id = "CLI001"
 
 
-    # 3. Historial de conversación del Asistente Digital
+    # 3. Historial de conversación del Asistente Digital (inicia vacío esperando la consulta del usuario)
     if "chat_history" not in st.session_state:
-        st.session_state.chat_history = [
-            {
-                "role": "assistant",
-                "content": "¡Hola! Soy tu **Asistente Digital Movistar**. He auditado tu recibo de Julio 2026. ¿En qué puedo ayudarte hoy? Puedes consultarme sobre tus variaciones de cobro, planes de fraccionamiento o mejoras con Movistar Total.",
-                "metadata": {"timestamp": datetime.now().strftime("%H:%M")}
-            }
-        ]
+        st.session_state.chat_history = []
 
     # 4. Cola de tickets escalados a asesor humano
     if "escalated_tickets" not in st.session_state:
@@ -168,14 +162,9 @@ def add_chat_message(role: str, content: str, metadata: Optional[Dict[str, Any]]
 
 
 def reset_chat():
-    """Reinicia la conversación actual con el saludo inicial de Yara AI."""
-    st.session_state.chat_history = [
-        {
-            "role": "assistant",
-            "content": "¡Hola! Soy **Yara AI**, tu copiloto inteligente de facturación de Movistar Perú. He auditado tu recibo de Julio 2026. ¿En qué puedo ayudarte hoy?",
-            "metadata": {"timestamp": datetime.now().strftime("%H:%M")}
-        }
-    ]
+    """Reinicia la conversación actual dejándola completamente limpia para iniciar un nuevo chat."""
+    st.session_state.chat_history = []
+
 
 
 def escalate_case_to_human(client_id: str, client_name: str, reason: str) -> str:

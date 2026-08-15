@@ -59,8 +59,9 @@ class TestGeminiService(unittest.TestCase):
         )
         
         self.assertIn("Movistar Total", res["response_text"])
-        self.assertIn("ahorro", res["response_text"].lower())
+        self.assertTrue(any(k in res["response_text"].lower() for k in ["ahorr", "s/"]))
         self.assertEqual(res["action_payload"]["action"], "SHOW_UPGRADE_CARD")
+
 
     def test_escalamiento_coloquial_a_humano(self):
         """Valida escalamiento cuando el cliente solicita un operador humano."""

@@ -21,17 +21,15 @@ class TestLandingAndNavigation(unittest.TestCase):
         self.assertEqual(st.session_state.view_mode, "landing")
 
     def test_reset_chat(self):
-        """Valida que reset_chat() reinicie el historial al saludo oficial."""
+        """Valida que reset_chat() limpie el historial para un nuevo chat."""
         st.session_state.chat_history.append({"role": "user", "content": "mensaje de prueba"})
-        self.assertGreater(len(st.session_state.chat_history), 1)
+        self.assertEqual(len(st.session_state.chat_history), 1)
         
         reset_chat()
-        self.assertEqual(len(st.session_state.chat_history), 1)
-        self.assertEqual(st.session_state.chat_history[0]["role"], "assistant")
-        self.assertIn("Yara AI", st.session_state.chat_history[0]["content"])
+        self.assertEqual(len(st.session_state.chat_history), 0)
 
     def test_render_views_without_exceptions(self):
-        """Valida que las 3 vistas rendericen limpiamente en modo bare."""
+        """Valida que las 3 vistas rendericen limpiamente."""
         try:
             render_landing_view()
             st.session_state.view_mode = "cliente"

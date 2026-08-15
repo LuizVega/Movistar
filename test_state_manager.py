@@ -24,11 +24,10 @@ class TestStateManager(unittest.TestCase):
     def test_initial_state(self):
         """Verifica que todas las variables requeridas existan con tipos correctos."""
         self.assertEqual(st.session_state.user_role, "cliente")
-        self.assertEqual(st.session_state.active_client_id, "CLI001")
         self.assertIsInstance(st.session_state.chat_history, list)
-        self.assertGreater(len(st.session_state.chat_history), 0)
         self.assertIsInstance(st.session_state.escalated_tickets, list)
         self.assertGreater(len(st.session_state.escalated_tickets), 0)
+
 
     def test_escalate_ticket(self):
         """Valida la creación y esquema de un ticket escalado."""

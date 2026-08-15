@@ -78,9 +78,23 @@ def render_cliente_view():
 
     # 2. Canvas Central de Chat
     cliente = get_active_client_data()
+    nombre_pila = cliente.get("nombre", "Cliente").split()[0]
 
     # Barra de razonamiento de Yara AI (Consultar -> Comprender -> Explicar)
     render_analysis_markers()
+
+    # Si el chat está vacío al inicio, mostrar mensaje de bienvenida limpio estilo Apple
+    if not st.session_state.chat_history:
+        st.markdown(f"""
+        <div style="text-align: center; margin: 50px auto 20px auto; max-width: 480px; padding: 20px;">
+            <img src="{YARA_AVATAR_URL}" style="width: 52px; height: 52px; border-radius: 50%; object-fit: cover; margin-bottom: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);" alt="Yara AI"/>
+            <h3 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 700; color: {theme['text_primary']};">¿En qué puedo ayudarte hoy, {nombre_pila}?</h3>
+            <p style="font-size: 14px; color: {theme['text_secondary']}; line-height: 1.5; margin: 0;">
+                Escribe tu consulta abajo para auditar tu recibo de Julio 2026, revisar prorrateos o consultar opciones de ahorro.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
 
     # Renderizado de Mensajes con estilo exacto de la captura
     for msg_idx, msg in enumerate(st.session_state.chat_history):
