@@ -1,10 +1,11 @@
 """
 components/chat_elements.py - Componentes UI de Yara AI Billing Copilot (Apple Minimalist + Movistar Colors)
-Renderiza tarjetas Bento de facturación, marcadores de análisis (Consultar -> Comprender -> Explicar),
-tarjetas de decisión de upgrade/fraccionamiento y modales de confirmación con soporte completo para Modo Claro y Oscuro.
+Renderiza tarjetas Bento de facturación, marcadores de análisis y modales de confirmación interactivos.
+Los botones de acción SOLO aparecen cuando el agente los recomienda explícitamente en el flujo conversacional.
 """
 
 import streamlit as st
+import re
 from typing import Dict, Any, Optional
 from datetime import datetime
 from state_manager import add_chat_message, CLIENTES_CATALOGO
@@ -14,6 +15,22 @@ from nbo_engine import generar_next_best_offer
 from diff_engine import auditar_variacion_recibo
 
 YARA_AVATAR_URL = "https://lh3.googleusercontent.com/aida-public/AB6AXuAK6qFdc2J_wKYqG2JmJHwr75_UuOq6HvRDxGPSGW7ElnZd8r0-Vq9MMRNS6TAsAaOd698fjpeVi5thubsxcuEDYCvxKRdD_udnIjO9xOJz8znzK6aVbwYHrxq2OpzJUnVEyAU9igi_ZSVuL3WvmklqJtp6OddNlV50r3vjjFOCF8krxLLgg-faEEmuIHHBoEIfgdujI-dxoWjKzh-1RBP1XLf5GOulW8hbi_2lIsIaf_jhfMwVSOXQ7g"
+
+
+def format_text_to_html(text: str) -> str:
+    """
+    Convierte sintaxis de texto a HTML limpio garantizando que negritas
+    (<strong>...</strong>) y saltos de línea se rendericen correctamente sin asteriscos.
+    """
+    if not text:
+        return ""
+    # Convertir **texto** a <strong>texto</strong>
+    html = re.sub(r"\*\*(.*?)\*\*", r"<strong style='font-weight: 700;'>\1</strong>", text)
+    # Convertir *texto* a <em>texto</em>
+    html = re.sub(r"\*(.*?)\*", r"<em>\1</em>", html)
+    # Convertir saltos de línea a <br>
+    html = html.replace("\n", "<br>")
+    return html
 
 
 def get_theme_colors() -> Dict[str, str]:
@@ -80,7 +97,7 @@ def render_bento_billing_card(cliente_context: Dict[str, Any], diff_data: Option
     motivo = conceptos[0]["concepto"] if conceptos else "Variación por ajuste de ciclo o prorrateo"
 
     st.markdown(f"""
-    <div style="background: {theme['bg_card']}; border-radius: 16px; border: 1px solid {theme['border']}; box-shadow: 0 4px 16px rgba(0,0,0,0.04); overflow: hidden; width: 100%; max-width: 520px; margin: 10px 0;">
+    <div style="background: {theme['bg_card']}; border-radius: 16px; border: 1px solid {theme['border']}; box-shadow: 0 4px 16px rgba(0,0,0,0.04); overflow: hidden; width: 100%; max-width: 520px; margin: 10px 0 14px 48px;">
         <div style="background: {theme['bg_card_header']}; padding: 12px 18px; border-bottom: 1px solid {theme['border']}; display: flex; justify-content: space-between; align-items: center;">
             <div style="font-size: 14px; font-weight: 700; color: {theme['highlight']}; display: flex; align-items: center; gap: 6px;">
                 📑 Desglose de Facturación
@@ -109,27 +126,26 @@ def render_bento_billing_card(cliente_context: Dict[str, Any], diff_data: Option
 
 
 def render_chat_action_elements(msg: Dict[str, Any], msg_idx: int, client_context: Dict[str, Any]):
-    """Renderiza tarjetas interactivas de decisión y botones de acción rápida."""
+    """
+    Renderiza tarjetas interactivas de decisión y botones de acción rápida.
+    IMPORTANTE: Los botones y tarjetas SOLO aparecen cuando el agente los recomienda explícitamente en el action_payload.
+    """
     theme = get_theme_colors()
     metadata = msg.get("metadata", {}) or {}
     action_payload = metadata.get("action_payload") or {}
-    content_lower = msg.get("content", "").lower()
     cid = str(client_context.get("id") or "CLI001").strip().upper()
 
     action_executed_key = f"action_executed_{msg_idx}"
     is_executed = st.session_state.get(action_executed_key, False)
 
-    # 1. Tarjeta Bento de Facturación si corresponde
-    if action_payload.get("action") == "SHOW_BILLING_BREAKDOWN" or any(k in content_lower for k in ["desglose", "variación", "variacion", "subió", "subio", "aumento", "prorrateo", "repetidor"]):
+    action_type = action_payload.get("action")
+
+    # 1. Si la acción recomendada es mostrar el Desglose de Facturación
+    if action_type == "SHOW_BILLING_BREAKDOWN":
         render_bento_billing_card(client_context)
 
-    # 2. Tarjeta / Modal de Confirmación para Movistar Total
-    is_upgrade_action = (
-        action_payload.get("action") in ["SHOW_UPGRADE_CARD", "UPGRADE_MOVISTAR_TOTAL"] or
-        ("movistar total" in content_lower and ("elegible" in content_lower or "ahorro" in content_lower or "plan recomendado" in content_lower))
-    )
-
-    if is_upgrade_action:
+    # 2. Si la acción recomendada es Upgrade a Movistar Total
+    elif action_type in ["SHOW_UPGRADE_CARD", "UPGRADE_MOVISTAR_TOTAL"]:
         nbo_data = action_payload.get("nbo") or generar_next_best_offer(cid)
         of = nbo_data.get("oferta_recomendada", {})
         ben = nbo_data.get("beneficio_economico", {})
@@ -141,7 +157,7 @@ def render_chat_action_elements(msg: Dict[str, Any], msg_idx: int, client_contex
         ahorro_mes = ben.get("ahorro_mensual_soles", 29.40)
 
         st.markdown(f"""
-        <div style="background: {theme['bg_card']}; border: 1px solid {theme['border']}; border-radius: 16px; padding: 18px 20px; box-shadow: 0 4px 16px rgba(0,0,0,0.04); max-width: 520px; margin: 10px 0;">
+        <div style="background: {theme['bg_card']}; border: 1px solid {theme['border']}; border-radius: 16px; padding: 18px 20px; box-shadow: 0 4px 16px rgba(0,0,0,0.04); max-width: 520px; margin: 10px 0 10px 48px;">
             <div style="display: flex; align-items: center; gap: 8px; color: {theme['highlight']}; margin-bottom: 6px;">
                 <span style="font-size: 18px;">⭐</span>
                 <span style="font-size: 15px; font-weight: 700;">Propuesta Movistar Total</span>
@@ -186,44 +202,49 @@ def render_chat_action_elements(msg: Dict[str, Any], msg_idx: int, client_contex
         else:
             st.caption("✅ *Operación gestionada.*")
 
-    # 3. Botones de Acción Sugerida (Sutiles y minimalistas)
-    elif not is_executed and not is_upgrade_action:
-        col_act1, col_act2, col_act3 = st.columns(3)
-        
-        with col_act1:
-            if st.button("💳 Pagar ahora", key=f"btn_pagar_s_{msg_idx}", use_container_width=True):
-                st.session_state[action_executed_key] = True
-                add_chat_message("user", "Deseo realizar el pago de mi recibo.")
-                add_chat_message(
-                    "assistant",
-                    f"💳 **Pasarela de Pago Movistar:** Redirigiendo a pasarela bancaria para el abono de `S/ {client_context.get('recibo_actual', 119.90):.2f}`."
-                )
-                st.rerun()
+    # 3. Si la acción recomendada es Fraccionamiento de Deuda
+    elif action_type == "SHOW_INSTALLMENT_MODAL":
+        monto_fracc = action_payload.get("monto", client_context.get("recibo_actual", 119.90))
+        if not is_executed:
+            st.markdown(f"""
+            <div style="background: {theme['bg_card']}; border: 1px solid {theme['border']}; border-radius: 16px; padding: 16px 20px; max-width: 520px; margin: 10px 0 10px 48px;">
+                <div style="font-size: 14px; font-weight: 700; color: {theme['highlight']}; margin-bottom: 6px;">💳 Opción de Fraccionamiento al 0% TCEA</div>
+                <div style="font-size: 13px; color: {theme['text_secondary']};">¿Deseas diferir tu saldo de S/ {monto_fracc:.2f} en 6 cuotas fijas de S/ {(monto_fracc/6):.2f}/mes?</div>
+            </div>
+            """, unsafe_allow_html=True)
+            col_f1, col_f2 = st.columns([1.2, 1.2])
+            with col_f1:
+                if st.button("✅ Fraccionar en 6 cuotas", key=f"btn_fracc_opt_{msg_idx}", type="primary", use_container_width=True):
+                    st.session_state[action_executed_key] = True
+                    res_fracc = ejecutar_fraccionamiento_deuda(cid, monto_fracc, 6)
+                    add_chat_message(
+                        role="assistant",
+                        content=f"🎉 **Fraccionamiento Aprobado.** Tu solicitud `{res_fracc['solicitud_id']}` fue procesada en 6 cuotas de S/ {res_fracc['monto_cuota']:.2f}/mes al 0.0% de interés."
+                    )
+                    st.rerun()
+            with col_f2:
+                if st.button("❌ No por ahora", key=f"btn_no_fracc_{msg_idx}", use_container_width=True):
+                    st.session_state[action_executed_key] = True
+                    st.rerun()
 
-        with col_act2:
-            if st.button("🚀 Cambiar de Plan", key=f"btn_cambiar_s_{msg_idx}", use_container_width=True):
-                st.session_state[action_executed_key] = True
-                add_chat_message("user", "Quiero evaluar planes y opciones de ahorro.")
-                nbo = generar_next_best_offer(cid)
-                of = nbo.get("oferta_recomendada", {})
-                add_chat_message(
-                    "assistant",
-                    f"Te propongo unirte a **{of.get('nombre_oferta', 'Movistar Total')}** por **S/ {of.get('precio_promocional', 110.40):.2f}/mes** para unificar y ahorrar más del 20% mensual.",
-                    metadata={"action_payload": {"action": "SHOW_UPGRADE_CARD", "nbo": nbo}}
-                )
-                st.rerun()
-
-        with col_act3:
-            if st.button("👨‍💼 Asesor Humano", key=f"btn_asesor_s_{msg_idx}", use_container_width=True):
-                st.session_state[action_executed_key] = True
-                ticket = escalar_a_humano(
-                    client_id=cid,
-                    chat_history=st.session_state.get("chat_history", []),
-                    motivo_detectado="Cliente solicita atención con asesor humano"
-                )
-                add_chat_message("user", "Deseo comunicarme con un asesor.")
-                add_chat_message(
-                    "assistant",
-                    f"🔔 **He transferido tu caso a un asesor.** Ticket de atención: **`{ticket['ticket_id']}`**."
-                )
-                st.rerun()
+    # 4. Botones puntuales recomendados por el agente
+    elif action_payload.get("show_action_buttons"):
+        btns = action_payload.get("show_action_buttons", [])
+        cols = st.columns(len(btns))
+        for idx_b, b_type in enumerate(btns):
+            with cols[idx_b]:
+                if b_type == "PAGAR" and st.button("💳 Pagar ahora", key=f"btn_p_rec_{msg_idx}", use_container_width=True):
+                    st.session_state[action_executed_key] = True
+                    add_chat_message("user", "Deseo pagar mi recibo.")
+                    add_chat_message("assistant", f"💳 **Pasarela Movistar:** Redirigiendo a pasarela bancaria segura para abonar S/ {client_context.get('recibo_actual', 119.90):.2f}.")
+                    st.rerun()
+                elif b_type == "CAMBIAR_PLAN" and st.button("🚀 Cambiar de Plan", key=f"btn_c_rec_{msg_idx}", use_container_width=True):
+                    st.session_state[action_executed_key] = True
+                    nbo = generar_next_best_offer(cid)
+                    add_chat_message("assistant", f"Te propongo migrar a **{nbo.get('oferta_recomendada', {}).get('nombre_oferta', 'Movistar Total')}** para ahorrar más del 20% mensual.", metadata={"action_payload": {"action": "SHOW_UPGRADE_CARD", "nbo": nbo}})
+                    st.rerun()
+                elif b_type == "ASESOR" and st.button("👨‍💼 Asesor Humano", key=f"btn_a_rec_{msg_idx}", use_container_width=True):
+                    st.session_state[action_executed_key] = True
+                    ticket = escalar_a_humano(cid, st.session_state.get("chat_history", []), "Cliente solicita asesor humano")
+                    add_chat_message("assistant", f"🔔 **He transferido tu caso a un asesor.** Ticket de atención: **`{ticket['ticket_id']}`**.")
+                    st.rerun()

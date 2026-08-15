@@ -14,6 +14,7 @@ from services.gemini_service import get_gemini_response
 from components.chat_elements import (
     render_analysis_markers,
     render_chat_action_elements,
+    format_text_to_html,
     YARA_AVATAR_URL,
     get_theme_colors
 )
@@ -73,19 +74,7 @@ def render_cliente_view():
                 reset_chat()
                 st.rerun()
 
-    # Expander sutil para configuración opcional de API Key de Gemini
-    with st.expander("⚙️ Configuración de IA (Opcional - Google Gemini Live)", expanded=False):
-        st.caption("Por defecto, Yara AI opera con su motor semántico neuronal determinista (0% alucinaciones). Puedes conectar tu API Key de Gemini:")
-        custom_key = st.text_input(
-            "Google Gemini API Key:",
-            value=st.session_state.get("gemini_api_key", ""),
-            type="password",
-            placeholder="Pega aquí tu API Key de Gemini...",
-            key="input_custom_gemini_key"
-        )
-        if custom_key != st.session_state.get("gemini_api_key"):
-            st.session_state.gemini_api_key = custom_key.strip()
-            st.success("API Key guardada para esta sesión.")
+    st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
 
     # 2. Canvas Central de Chat
     cliente = get_active_client_data()
@@ -97,28 +86,29 @@ def render_cliente_view():
     for msg_idx, msg in enumerate(st.session_state.chat_history):
         role = msg.get("role", "assistant")
         content = msg.get("content", "")
+        formatted_html = format_text_to_html(content)
 
         if role == "user":
-            # Burbuja de Usuario (Estilo captura: azul Movistar #00639c, borde redondeado, alineada a la derecha)
+            # Burbuja de Usuario (Azul Movistar #00639c, redondeado, alineado a la derecha)
             st.markdown(f"""
             <div style="display: flex; justify-content: flex-end; margin-bottom: 14px;">
                 <div style="background: #00639c; color: #ffffff; border-radius: 18px 18px 2px 18px; padding: 12px 20px; font-size: 15px; font-weight: 500; max-width: 80%; box-shadow: 0 2px 8px rgba(0,99,156,0.18); line-height: 1.45;">
-                    {content}
+                    {formatted_html}
                 </div>
             </div>
             """, unsafe_allow_html=True)
         else:
-            # Burbuja de Asistente (Estilo captura: avatar circular a la izquierda + caja blanca/gris con borde sutil)
+            # Burbuja de Asistente (Avatar circular + caja limpia con negritas renderizadas correctamente)
             st.markdown(f"""
             <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px;">
                 <img src="{YARA_AVATAR_URL}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; margin-top: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.1);" alt="Yara AI"/>
-                <div style="background: {theme['bg_card']}; color: {theme['text_primary']}; border: 1px solid {theme['border']}; border-radius: 18px 18px 18px 2px; padding: 14px 20px; font-size: 15px; line-height: 1.5; max-width: 85%; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
-                    {content}
+                <div style="background: {theme['bg_card']}; color: {theme['text_primary']}; border: 1px solid {theme['border']}; border-radius: 18px 18px 18px 2px; padding: 14px 20px; font-size: 15px; line-height: 1.55; max-width: 85%; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
+                    {formatted_html}
                 </div>
             </div>
             """, unsafe_allow_html=True)
             
-            # Elementos de acción interactiva si existen en la respuesta
+            # Elementos de acción interactiva si el agente los recomendó
             render_chat_action_elements(msg, msg_idx, cliente)
 
     # 3. Input de Chat Fijo en la parte inferior
@@ -130,8 +120,7 @@ def render_cliente_view():
         gemini_res = get_gemini_response(
             chat_history=st.session_state.chat_history,
             user_message=prompt,
-            client_context=cliente,
-            api_key_override=st.session_state.get("gemini_api_key")
+            client_context=cliente
         )
         
         # 3. Guardar respuesta del asistente
