@@ -44,10 +44,10 @@ def render_cliente_view():
     # Selector de Cliente / Perfil Activo con Memoria Conversacional Persistente
     with col_nav_user:
         opciones_usuarios = {
-            cid: f"{data['nombre']} ({cid} - {data['servicio']})"
+            cid: f"{data['nombre']} ({cid} - {data.get('escenario_tag', data.get('servicio'))})"
             for cid, data in CLIENTES_CATALOGO.items()
         }
-        current_id = st.session_state.get("active_client_id", "CLI001")
+        current_id = st.session_state.get("active_client_id", "CLI004")
         idx_cur = list(opciones_usuarios.keys()).index(current_id) if current_id in opciones_usuarios else 0
 
         selected_user = st.selectbox(
@@ -75,11 +75,31 @@ def render_cliente_view():
                 reset_chat()
                 st.rerun()
 
-    st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
     # 2. Canvas Central de Chat
     cliente = get_active_client_data()
     nombre_pila = cliente.get("nombre", "Cliente").split()[0]
+    mod_fac = cliente.get("modalidad_facturacion", "Renta Adelantada")
+    prod_b2c = cliente.get("tipo_producto_b2c", cliente.get("servicio", "B2C"))
+    esc_tag = cliente.get("escenario_tag", "Facturación")
+
+    # Banner informativo de Demostración Hackathon
+    badge_mod_bg = "#e0f2fe" if mod_fac == "Renta Adelantada" else "#fef3c7"
+    badge_mod_fg = "#0284c7" if mod_fac == "Renta Adelantada" else "#b45309"
+
+    st.markdown(f"""
+    <div style="display: flex; align-items: center; justify-content: space-between; background: {theme['bg_card_header']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 6px 14px; margin-bottom: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: {theme['text_primary']};">
+            <span style="font-weight: 700;">🎯 Demo:</span>
+            <span style="background: {badge_mod_bg}; color: {badge_mod_fg}; font-weight: 700; padding: 2px 8px; border-radius: 6px; font-size: 11px;">{mod_fac}</span>
+            <span style="font-weight: 600; color: {theme['text_secondary']};">| {prod_b2c}</span>
+        </div>
+        <span style="background: #eef2ff; color: #4338ca; font-weight: 700; font-size: 11px; padding: 2px 8px; border-radius: 6px;">
+            {esc_tag}
+        </span>
+    </div>
+    """, unsafe_allow_html=True)
 
     # Barra de razonamiento de Yara AI (Consultar -> Comprender -> Explicar)
     render_analysis_markers()
@@ -87,16 +107,17 @@ def render_cliente_view():
     # Si el chat está vacío al inicio, mostrar mensaje de bienvenida limpio estilo Apple y mini-dashboard
     if not st.session_state.chat_history:
         st.markdown(f"""
-        <div style="text-align: center; margin: 30px auto 10px auto; max-width: 480px; padding: 10px 20px;">
-            <img src="{YARA_AVATAR_URL}" style="width: 52px; height: 52px; border-radius: 50%; object-fit: cover; margin-bottom: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);" alt="Yara AI"/>
-            <h3 style="margin: 0 0 6px 0; font-size: 22px; font-weight: 700; color: {theme['text_primary']};">¡Hola {nombre_pila}! Soy Yara AI</h3>
-            <p style="font-size: 14px; color: {theme['text_secondary']}; line-height: 1.45; margin: 0 0 10px 0;">
+        <div style="text-align: center; margin: 20px auto 10px auto; max-width: 480px; padding: 6px 20px;">
+            <img src="{YARA_AVATAR_URL}" style="width: 52px; height: 52px; border-radius: 50%; object-fit: cover; margin-bottom: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);" alt="Yara AI"/>
+            <h3 style="margin: 0 0 4px 0; font-size: 21px; font-weight: 700; color: {theme['text_primary']};">¡Hola {nombre_pila}! Soy Yara AI</h3>
+            <p style="font-size: 13px; color: {theme['text_secondary']}; line-height: 1.4; margin: 0 0 10px 0;">
                 Tu copiloto de facturación. Aquí tienes el estado actual de tu cuenta:
             </p>
         </div>
         """, unsafe_allow_html=True)
         from components.chat_elements import render_client_dashboard_card
         render_client_dashboard_card(cliente)
+
 
 
 

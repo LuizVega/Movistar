@@ -228,26 +228,40 @@ def render_trabajador_view():
             c_display_phone = mask_sensitive_data(c_display_phone)
 
         # Header del Expediente
-        col_h1, col_h2 = st.columns([2.2, 1.0])
+        mod_fac = cliente_meta.get("modalidad_facturacion", "Renta Adelantada")
+        prod_b2c = cliente_meta.get("tipo_producto_b2c", cliente_meta.get("servicio", "B2C"))
+        esc_tag = cliente_meta.get("escenario_tag", cliente_meta.get("motivo_principal", "Facturación"))
+
+        badge_m_bg = "#e0f2fe" if mod_fac == "Renta Adelantada" else "#fef3c7"
+        badge_m_fg = "#0284c7" if mod_fac == "Renta Adelantada" else "#b45309"
+
+        col_h1, col_h2 = st.columns([2.3, 0.9])
         with col_h1:
             st.markdown(f"""
             <div style="background: {theme['bg_card']}; border: 1px solid {theme['border']}; border-radius: 14px; padding: 14px 18px; margin-bottom: 10px; border-left: 4px solid {theme['highlight']};">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div>
-                        <div style="font-size: 16px; font-weight: 800; color: {theme['text_primary']};">{c_display_name}</div>
-                        <div style="font-size: 12px; color: {theme['text_secondary']};">
-                            ID: <code>{cid}</code> | Móvil: <strong>{c_display_phone}</strong> | Plan: <strong>{cliente_meta.get('plan_actual', cliente_meta.get('servicio'))}</strong>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 16px; font-weight: 800; color: {theme['text_primary']};">{c_display_name}</span>
+                            <span style="background: {badge_m_bg}; color: {badge_m_fg}; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px;">{mod_fac}</span>
+                        </div>
+                        <div style="font-size: 12px; color: {theme['text_secondary']}; margin-top: 4px;">
+                            ID: <code>{cid}</code> | Móvil: <strong>{c_display_phone}</strong> | Producto: <strong>{prod_b2c}</strong>
                         </div>
                     </div>
+                    <span style="background: #eef2ff; color: #4338ca; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px;">
+                        {esc_tag}
+                    </span>
                 </div>
             </div>
             """, unsafe_allow_html=True)
         with col_h2:
-            if st.button("💬 Ir a Chat con Cliente", key=f"btn_jump_to_chat_{t_id}", type="primary", use_container_width=True):
+            if st.button("💬 Ir a Chat Cliente", key=f"btn_jump_to_chat_{t_id}", type="primary", use_container_width=True):
                 switch_active_client(cid)
                 st.session_state.view_mode = "cliente"
                 st.session_state.user_role = "cliente"
                 st.rerun()
+
 
         # Tabs de Inspección
         tab_resumen, tab_chat, tab_gestion = st.tabs([
