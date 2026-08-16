@@ -217,10 +217,12 @@ INSTRUCCIONES CLAVE:
 1. Responde en **MÁXIMO 1 O 2 ORACIONES (20 a 30 palabras)** con un tono humano, horizontal y transparente.
 2. Si el cliente pregunta cuánto paga o por qué subió, explícale con total claridad que su tarifa base es S/ {recibo_ant:.2f} y que los +S/ {monto_var:.2f} corresponden a '{motivo_var}'.
 3. Si el cliente pregunta cuánto paga por internet y cuánto por móvil, aclara que su plan base es S/ {recibo_ant:.2f} y el repetidor/adicional es S/ {monto_var:.2f}.
-4. Si el cliente pide explícitamente información de Movistar Total o cambio de plan, dale el precio de S/ {precio_mt:.2f} y el ahorro mensual de S/ {ahorro_soles:.2f}.
-5. EFECTO EFERVESCENTE: Si el cliente agradece o finaliza ('gracias', 'listo', 'entendido'), despídete recordando con calidez los beneficios que ya tiene en su plan actual ('{beneficios_cliente}'), sin ofrecer adiciones nuevas.
-6. De lo contrario, NO ofrezcas Movistar Total y limítate a resolver exactamente lo que preguntó.
+4. Si el cliente pregunta qué puede hacer, qué opciones tiene o cómo solucionarlo, indícale amablemente que puede pagar su recibo, solicitar un fraccionamiento en cuotas, registrar una consulta formal o pedir atención con un asesor.
+5. Si el cliente pide explícitamente información de Movistar Total o cambio de plan, dale el precio de S/ {precio_mt:.2f} y el ahorro mensual de S/ {ahorro_soles:.2f}.
+6. EFECTO EFERVESCENTE: Si el cliente agradece o finaliza ('gracias', 'listo', 'entendido'), despídete recordando con calidez los beneficios que ya tiene en su plan actual ('{beneficios_cliente}'), sin ofrecer adiciones nuevas.
+7. De lo contrario, NO ofrezcas Movistar Total y limítate a resolver exactamente lo que preguntó.
 """
+
 
     gemini_key = api_key_override or os.environ.get("GEMINI_API_KEY") or config.GEMINI_API_KEY
     if gemini_key and len(gemini_key) > 10:
@@ -238,7 +240,7 @@ INSTRUCCIONES CLAVE:
                 action_payload = {"action": "SHOW_UPGRADE_CARD", "nbo": nbo_data}
             elif any(p in msg_lower for p in ["fraccionar", "cuotas", "diferir"]):
                 action_payload = {"action": "SHOW_INSTALLMENT_MODAL", "monto": recibo_act}
-            elif any(p in msg_lower for p in ["por qué", "porque", "subio", "subió", "cobran de mas", "recibo", "desglose", "detalle", "cuanto pago", "cuánto pago", "vino mas", "vino más"]):
+            elif any(p in msg_lower for p in ["por qué", "porque", "subio", "subió", "cobran de mas", "recibo", "desglose", "detalle", "cuanto pago", "cuánto pago", "vino mas", "vino más", "que puedo hacer", "qué puedo hacer", "que opciones tengo", "qué opciones tengo", "como soluciono", "cómo soluciono", "alternativas"]):
                 action_payload = {
                     "action": "SHOW_ACTIONS_HUB",
                     "variacion": var_info,
@@ -263,6 +265,19 @@ INSTRUCCIONES CLAVE:
     if es_saludo_inicial or any(msg_low == s or msg_low.startswith(s + " ") for s in ["hola", "hi", "hello", "buenas", "oye", "habla"]):
         resp_text = f"¡Hola {nombre_cliente}! Dime en qué te puedo apoyar hoy con tu servicio de Movistar."
         action_payload = {"action": "SHOW_DASHBOARD"}
+
+    elif any(p in msg_low for p in ["que puedo hacer", "qué puedo hacer", "que opciones tengo", "qué opciones tengo", "como soluciono", "cómo soluciono", "opciones", "no puedo pagar todo"]):
+        resp_text = (
+            f"Puedes realizar el pago directo de tu recibo (S/ {recibo_act:.2f}), solicitar un fraccionamiento en cuotas sin intereses, "
+            f"registrar una consulta de revisión técnica o comunicarte con un asesor."
+        )
+        action_payload = {
+            "action": "SHOW_ACTIONS_HUB",
+            "variacion": var_info,
+            "nbo": nbo_data if puede_cross_selling else None,
+            "puede_cross_selling": puede_cross_selling,
+            "motivo_var": motivo_var
+        }
 
     elif any(p in msg_low for p in ["cuanto pago", "cuánto pago", "desglose", "detalle"]):
         resp_text = (
@@ -301,12 +316,13 @@ INSTRUCCIONES CLAVE:
     elif any(p in msg_low for p in ["gracias", "listo", "entendido", "ok", "vale", "ya entendi"]):
         resp_text = f"¡Un placer, {nombre_cliente}! Recuerda que tu plan ya incluye {beneficios_cliente} para disfrutar en casa. ¡Que tengas un excelente día!"
 
-    elif any(p in msg_low for p in ["cambiar plan", "cambiar de plan", "movistar total", "unificar", "upgrade", "ahorro", "alternativas"]):
+    elif any(p in msg_low for p in ["cambiar plan", "cambiar de plan", "movistar total", "unificar", "upgrade", "ahorro"]):
         resp_text = f"Puedes migrar a **{nombre_mt}** por solo **S/ {precio_mt:.2f}/mes**, con un ahorro mensual de **S/ {ahorro_soles:.2f}** en tu cuenta."
         action_payload = {"action": "SHOW_UPGRADE_CARD", "nbo": nbo_data}
 
     else:
         resp_text = f"Hola {nombre_cliente}, tu plan actual es de **S/ {recibo_ant:.2f}/mes**. ¿Qué detalle deseas revisar?"
+
 
     return {
         "response_text": resp_text,

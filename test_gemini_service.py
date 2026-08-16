@@ -105,7 +105,21 @@ class TestGeminiService(unittest.TestCase):
         self.assertIn("action_payload", res)
         self.assertIn(res["action_payload"]["action"], ["SHOW_ACTIONS_HUB", "SHOW_BILLING_BREAKDOWN"])
 
+    def test_consulta_posibles_acciones(self):
+        """Valida que cuando el cliente pregunta qué opciones o qué puede hacer, la IA le recomiende acciones."""
+        client_ctx = CLIENTES_CATALOGO["CLI001"]
+        prompt = "¿Qué opciones tengo o qué puedo hacer con este recibo?"
+        res = get_gemini_response(
+            chat_history=[],
+            user_message=prompt,
+            client_context=client_ctx
+        )
+        self.assertIn("action_payload", res)
+        self.assertEqual(res["action_payload"]["action"], "SHOW_ACTIONS_HUB")
+        self.assertTrue(any(k in res["response_text"].lower() for k in ["pago", "pagar", "fraccion", "cuotas", "consulta", "asesor", "opci", "recibo", "plan"]))
+
     def test_system_prompt_maestro(self):
+
         """Valida que el System Prompt contenga las directivas de Yara AI y 0% alucinaciones."""
         self.assertIn("YARA AI", YARA_SYSTEM_PROMPT)
         self.assertIn("0% ALUCINACIONES", YARA_SYSTEM_PROMPT)
@@ -113,5 +127,6 @@ class TestGeminiService(unittest.TestCase):
 
 
 if __name__ == "__main__":
+
 
     unittest.main()

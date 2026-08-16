@@ -1,90 +1,122 @@
 """
-views/trabajador_view.py - Panel de Control Optimizado del Asesor CRM (Movistar Perú)
-Permite gestionar en tiempo real los tickets escalados por Yara AI, visualizar la ficha del cliente,
-revisar el historial de chat con la IA, enviar respuestas y aplicar soluciones comerciales inmediatas.
+views/trabajador_view.py - Panel de Control del Asesor CRM (Diseño Apple Minimalist + Movistar Colors)
+Sincronizado en tiempo real con el Chat del Cliente, con Resumen Ejecutivo de IA,
+Protección de Datos Personales (Anonimización) y Acciones Inmediatas de Resolución.
 """
 
 import streamlit as st
 from datetime import datetime
+from typing import Dict, Any, Optional
 from state_manager import (
     CLIENTES_CATALOGO,
     update_ticket_status,
     add_chat_message,
+    switch_active_client,
     get_active_client_data
 )
 from diff_engine import auditar_variacion_recibo
 from database import get_ficha_cliente_completa
 from nbo_engine import generar_next_best_offer
+from components.chat_elements import get_theme_colors, YARA_AVATAR_URL
+
+
+def mask_sensitive_data(val: str) -> str:
+    """Aplica anonimización y enmascaramiento para seguridad de datos personales."""
+    if not val:
+        return "••••••••"
+    val_str = str(val).strip()
+    if len(val_str) <= 4:
+        return "••••"
+    return f"{val_str[:2]}••••{val_str[-2:]}"
 
 
 def render_trabajador_view():
-    """Renderiza el panel de control del asesor CRM optimizado y libre de errores."""
-    
-    # 1. Barra Superior con Botón de Navegación Arriba a la Izquierda
-    col_nav_left, col_nav_center, col_nav_right = st.columns([2.5, 3.5, 2.0])
+    """Renderiza el panel de control del asesor con diseño Apple Minimalist y conexión total con Yara AI."""
+    theme = get_theme_colors()
+    is_dark = st.session_state.get("theme_mode", "light") == "dark"
+    privacy_mode = st.session_state.get("privacy_mode_active", False)
+
+    # 1. Barra de Navegación Superior
+    col_nav_left, col_nav_center, col_nav_right = st.columns([2.0, 3.2, 2.4])
 
     with col_nav_left:
-        t_btn1, t_btn2 = st.columns(2)
-        with t_btn1:
-            if st.button("👤 Cliente", key="btn_switch_to_client_top_worker", use_container_width=True):
+        btn_c1, btn_c2 = st.columns(2)
+        with btn_c1:
+            if st.button("👤 Chat Cliente", key="btn_to_client_from_worker", type="primary", use_container_width=True):
                 st.session_state.view_mode = "cliente"
                 st.session_state.user_role = "cliente"
                 st.rerun()
-        with t_btn2:
-            if st.button("🏠 Inicio", key="btn_switch_to_landing_top_worker", use_container_width=True):
+        with btn_c2:
+            if st.button("🏠 Inicio", key="btn_to_landing_from_worker", use_container_width=True):
                 st.session_state.view_mode = "landing"
                 st.rerun()
 
     with col_nav_center:
-        st.markdown("""
+        st.markdown(f"""
         <div style="display: flex; align-items: center; justify-content: center; gap: 8px; padding-top: 4px;">
-            <span style="font-size: 18px;">👔</span>
-            <span style="font-size: 17px; font-weight: 800; color: #0a2540;">Bandeja CRM</span>
-            <span style="font-size: 12px; color: #64748b; font-weight: 600;">| Atención y Derivaciones</span>
+            <span style="font-size: 20px;">👔</span>
+            <span style="font-size: 17px; font-weight: 800; color: {theme['highlight']};">Bandeja de Asesor CRM</span>
+            <span style="font-size: 11px; background: #e0f2fe; color: #0284c7; padding: 2px 8px; border-radius: 9999px; font-weight: 700;">🟢 En Vivo</span>
         </div>
         """, unsafe_allow_html=True)
 
     with col_nav_right:
-        col_w_th, col_w_user = st.columns([0.6, 1.4])
-        with col_w_th:
-            is_dark = st.session_state.get("theme_mode", "light") == "dark"
+        col_priv, col_th = st.columns([1.5, 0.7])
+        with col_priv:
+            label_priv = "🔒 Privacidad: ON" if privacy_mode else "🔓 Privacidad: OFF"
+            if st.button(label_priv, key="btn_toggle_privacy_crm", help="Anonimizar datos personales sensibles"):
+                st.session_state.privacy_mode_active = not privacy_mode
+                st.rerun()
+        with col_th:
             theme_icon = "🌙" if not is_dark else "☀️"
-            if st.button(theme_icon, key="btn_toggle_theme_worker", help="Modo Claro / Oscuro"):
+            if st.button(theme_icon, key="btn_theme_worker", help="Alternar Modo Claro / Oscuro"):
                 st.session_state.theme_mode = "dark" if not is_dark else "light"
                 st.rerun()
-        with col_w_user:
-            st.markdown("""
-            <div style="text-align: right; font-size: 12px; color: #64748b; padding-top: 6px;">
-                Asesor: <strong style="color: #00639c;">Carlos Vega</strong>
-            </div>
-            """, unsafe_allow_html=True)
 
+    st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+
+    # 2. Métricas Resumen Bento
+    tickets = st.session_state.get("escalated_tickets", [])
+    total_t = len(tickets)
+    pend_t = sum(1 for t in tickets if t.get("status") == "PENDIENTE")
+    atn_t = sum(1 for t in tickets if t.get("status") == "EN_ATENCION")
+    res_t = sum(1 for t in tickets if t.get("status") == "RESUELTO")
+
+    m1, m2, m3, m4 = st.columns(4)
+    with m1:
+        st.markdown(f"""
+        <div style="background: {theme['bg_card']}; border: 1px solid {theme['border']}; border-radius: 14px; padding: 12px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
+            <div style="font-size: 11px; font-weight: 600; color: {theme['text_secondary']}; text-transform: uppercase;">Total Derivaciones</div>
+            <div style="font-size: 20px; font-weight: 800; color: {theme['text_primary']}; margin-top: 2px;">📋 {total_t}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with m2:
+        st.markdown(f"""
+        <div style="background: {theme['bg_card']}; border: 1px solid {theme['border']}; border-radius: 14px; padding: 12px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
+            <div style="font-size: 11px; font-weight: 600; color: #dc2626; text-transform: uppercase;">Pendientes</div>
+            <div style="font-size: 20px; font-weight: 800; color: #dc2626; margin-top: 2px;">🚨 {pend_t}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with m3:
+        st.markdown(f"""
+        <div style="background: {theme['bg_card']}; border: 1px solid {theme['border']}; border-radius: 14px; padding: 12px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
+            <div style="font-size: 11px; font-weight: 600; color: #d97706; text-transform: uppercase;">En Atención</div>
+            <div style="font-size: 20px; font-weight: 800; color: #d97706; margin-top: 2px;">⏳ {atn_t}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with m4:
+        st.markdown(f"""
+        <div style="background: {theme['bg_card']}; border: 1px solid {theme['border']}; border-radius: 14px; padding: 12px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
+            <div style="font-size: 11px; font-weight: 600; color: #16a34a; text-transform: uppercase;">Resueltos</div>
+            <div style="font-size: 20px; font-weight: 800; color: #16a34a; margin-top: 2px;">✅ {res_t}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 
-    # 2. Métricas de la Cola CRM
-    tickets = st.session_state.get("escalated_tickets", [])
-    total_tickets = len(tickets)
-    pendientes = sum(1 for t in tickets if t.get("status") == "PENDIENTE")
-    en_atencion = sum(1 for t in tickets if t.get("status") == "EN_ATENCION")
-    resueltos = sum(1 for t in tickets if t.get("status") == "RESUELTO")
-
-    m_col1, m_col2, m_col3, m_col4 = st.columns(4)
-    with m_col1:
-        st.metric("Total Tickets", f"📋 {total_tickets}")
-    with m_col2:
-        st.metric("Pendientes", f"🚨 {pendientes}")
-    with m_col3:
-        st.metric("En Atención", f"⏳ {en_atencion}")
-    with m_col4:
-        st.metric("Resueltos", f"✅ {resueltos}")
-
-    st.markdown("---")
-
-    # Si la cola está vacía, mostrar mensaje amigable y botón para crear caso de prueba
     if not tickets:
         st.info("ℹ️ No hay tickets registrados en la cola en este momento.")
-        if st.button("➕ Generar Ticket de Prueba para Demostración", key="btn_gen_test_ticket"):
+        if st.button("➕ Generar Ticket de Prueba para Demostración", key="btn_gen_test_ticket_w"):
             from state_manager import escalate_case_to_human
             escalate_case_to_human(
                 client_id="CLI001",
@@ -100,13 +132,15 @@ def render_trabajador_view():
         filtro_estado = st.selectbox(
             "Filtrar por Estado:",
             ["TODOS", "PENDIENTE", "EN_ATENCION", "RESUELTO"],
-            key="sel_filtro_estado_crm"
+            key="sel_filtro_estado_crm",
+            label_visibility="collapsed"
         )
     with col_search:
         search_query = st.text_input(
-            "🔍 Buscar por Cliente, DNI o ID de Ticket:",
-            placeholder="Ej: Lucía Ramos / TCK-1001",
-            key="input_search_ticket_crm"
+            "🔍 Buscar Ticket o Cliente:",
+            placeholder="Buscar por ID, Cliente o Motivo...",
+            key="input_search_ticket_crm",
+            label_visibility="collapsed"
         ).strip().lower()
 
     tickets_filtrados = [
@@ -115,51 +149,54 @@ def render_trabajador_view():
            (not search_query or search_query in t.get("ticket_id", "").lower() or search_query in t.get("client_name", "").lower() or search_query in t.get("client_id", "").lower())
     ]
 
-    # 4. Layout Dividido: Lista de Casos (Izquierda) + Ficha y Expediente (Derecha)
-    col_lista, col_detalle = st.columns([1.2, 2.2])
+    # 4. Layout Dividido: Bandeja (Izquierda) + Expediente 360° (Derecha)
+    col_lista, col_detalle = st.columns([1.1, 2.1])
 
     with col_lista:
-        st.markdown("#### 📋 Casos Derivados")
-        
+        st.markdown(f"<div style='font-size: 14px; font-weight: 700; color: {theme['text_primary']}; margin-bottom: 8px;'>📋 Casos en Espera</div>", unsafe_allow_html=True)
+
         if not tickets_filtrados:
-            st.caption("No se encontraron tickets con los filtros actuales.")
-        
+            st.caption("No se encontraron tickets con los filtros seleccionados.")
+
         for t in tickets_filtrados:
             t_id = t["ticket_id"]
             is_selected = (t_id == st.session_state.get("selected_ticket_id"))
-            border_col = "#005cff" if is_selected else "#e2e8f0"
-            bg_col = "#f0f7ff" if is_selected else "#ffffff"
+            border_col = theme["highlight"] if is_selected else theme["border"]
+            bg_col = "#e0f2fe" if (is_selected and not is_dark) else (theme["bg_card"] if not is_selected else "#1e3a5f")
 
-            badge_bg = "#fee2e2" if t.get("status") == "PENDIENTE" else ("#fff3eb" if t.get("status") == "EN_ATENCION" else "#e6f7ee")
-            badge_fg = "#dc2626" if t.get("status") == "PENDIENTE" else ("#ff6a00" if t.get("status") == "EN_ATENCION" else "#00a650")
-            prioridad_str = "🔥 ALTA" if t.get("priority") == "ALTA" else "MEDIA"
+            badge_bg = "#fee2e2" if t.get("status") == "PENDIENTE" else ("#fff3eb" if t.get("status") == "EN_ATENCION" else "#dcfce7")
+            badge_fg = "#dc2626" if t.get("status") == "PENDIENTE" else ("#d97706" if t.get("status") == "EN_ATENCION" else "#15803d")
+            prio_label = "🔥 ALTA" if t.get("priority") == "ALTA" else "MEDIA"
+
+            c_name = t.get("client_name", "Cliente")
+            if privacy_mode:
+                c_name = mask_sensitive_data(c_name)
 
             st.markdown(f"""
-            <div style="background: {bg_col}; border: 1px solid {border_col}; border-radius: 12px; padding: 12px 16px; margin-bottom: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.02);">
+            <div style="background: {bg_col}; border: 1px solid {border_col}; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.02);">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <strong style="color: #0a2540; font-size: 14px;">{t_id}</strong>
+                    <strong style="color: {theme['highlight']}; font-size: 13px;">{t_id}</strong>
                     <span style="background: {badge_bg}; color: {badge_fg}; font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 9999px;">{t.get('status')}</span>
                 </div>
-                <div style="font-size: 13px; font-weight: 700; color: #1e293b; margin-top: 4px;">
-                    {t.get('client_name')} <span style="font-size: 11px; color: #64748b; font-weight: normal;">(ID: {t.get('client_id')})</span>
+                <div style="font-size: 13px; font-weight: 700; color: {theme['text_primary']}; margin-top: 4px;">
+                    {c_name} <span style="font-size: 11px; color: {theme['text_secondary']}; font-weight: normal;">({t.get('client_id')})</span>
                 </div>
-                <div style="font-size: 12px; color: #475569; margin-top: 4px; line-height: 1.3;">
-                    <strong>Motivo:</strong> {t.get('reason', '')[:65]}...
+                <div style="font-size: 12px; color: {theme['text_secondary']}; margin-top: 4px; line-height: 1.3;">
+                    {t.get('reason', '')[:65]}...
                 </div>
-                <div style="font-size: 11px; color: #94a3b8; margin-top: 6px;">
-                    🕒 {t.get('timestamp', '')} · Prioridad: <strong>{prioridad_str}</strong>
+                <div style="font-size: 10px; color: {theme['text_secondary']}; margin-top: 6px;">
+                    🕒 {t.get('timestamp', '')} · Prioridad: <strong>{prio_label}</strong>
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
-            if st.button(f"Abrir Expediente {t_id}", key=f"btn_open_exp_{t_id}", use_container_width=True):
+            if st.button(f"📂 Ver Expediente {t_id}", key=f"btn_open_exp_{t_id}", use_container_width=True):
                 st.session_state.selected_ticket_id = t_id
                 if t.get("status") == "PENDIENTE":
                     update_ticket_status(t_id, "EN_ATENCION", agent="Carlos Vega")
                 st.rerun()
 
     with col_detalle:
-        # Resolver ticket seleccionado de forma segura
         selected_id = st.session_state.get("selected_ticket_id")
         t_sel = next((t for t in tickets if t["ticket_id"] == selected_id), tickets[0] if tickets else None)
 
@@ -169,115 +206,159 @@ def render_trabajador_view():
 
         t_id = t_sel["ticket_id"]
         cid = t_sel.get("client_id", "CLI001")
-
-        st.markdown(f"### 📂 Expediente del Caso: **`{t_id}`**")
-
         cliente_meta = CLIENTES_CATALOGO.get(cid, {
             "id": cid,
             "nombre": t_sel.get("client_name", "Cliente"),
             "servicio": "Plan Fibra Óptica + Móvil",
-            "telefono": "987-654-321",
-            "periodo": "2026-07",
             "recibo_actual": 119.90,
             "recibo_anterior": 89.90,
-            "estado_linea": "Activa"
+            "diferencia": 30.00,
+            "motivo_principal": "Ajuste de facturación",
+            "beneficios_actuales": "Internet simétrico y minutos ilimitados"
         })
 
-        tel_display = cliente_meta.get("telefono") or cliente_meta.get("telefono_movil", "987654321")
-        serv_display = cliente_meta.get("servicio", "Plan Fibra Óptica")
-
-        ficha = get_ficha_cliente_completa(cid)
-        diff_audit = auditar_variacion_recibo(cid, cliente_meta.get("periodo", "2026-07"))
+        diff_audit = auditar_variacion_recibo(cid, "2026-07")
         nbo_data = generar_next_best_offer(cid)
+        ai_exec = t_sel.get("ai_exec") or {}
 
-        # Tabs de Inspección
-        tab1, tab2, tab3 = st.tabs([
-            "📊 **1. Ficha del Cliente**",
-            "💬 **2. Transcripción con Yara AI**",
-            "🛠️ **3. Gestión & Resolución**"
-        ])
+        c_display_name = cliente_meta["nombre"]
+        c_display_phone = cliente_meta.get("telefono_movil", "987654321")
+        if privacy_mode:
+            c_display_name = mask_sensitive_data(c_display_name)
+            c_display_phone = mask_sensitive_data(c_display_phone)
 
-
-        # TAB 1: FICHA Y FACTURACIÓN
-        with tab1:
+        # Header del Expediente
+        col_h1, col_h2 = st.columns([2.2, 1.0])
+        with col_h1:
             st.markdown(f"""
-            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 18px; margin-bottom: 12px; border-left: 4px solid #005cff;">
+            <div style="background: {theme['bg_card']}; border: 1px solid {theme['border']}; border-radius: 14px; padding: 14px 18px; margin-bottom: 10px; border-left: 4px solid {theme['highlight']};">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <div>
-                        <div style="font-size: 17px; font-weight: 800; color: #0a2540;">{t_sel.get('client_name')}</div>
-                        <div style="font-size: 12px; color: #64748b;">
-                            ID: <code>{cid}</code> | Tel: <strong>{tel_display}</strong> | Plan: <strong>{serv_display}</strong>
+                        <div style="font-size: 16px; font-weight: 800; color: {theme['text_primary']};">{c_display_name}</div>
+                        <div style="font-size: 12px; color: {theme['text_secondary']};">
+                            ID: <code>{cid}</code> | Móvil: <strong>{c_display_phone}</strong> | Plan: <strong>{cliente_meta.get('plan_actual', cliente_meta.get('servicio'))}</strong>
                         </div>
                     </div>
-                    <span style="background: #e6f7ee; color: #00a650; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 9999px;">
-                        ● {cliente_meta.get('estado_linea', cliente_meta.get('estado_linea_movil', 'Activa'))}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        with col_h2:
+            if st.button("💬 Ir a Chat con Cliente", key=f"btn_jump_to_chat_{t_id}", type="primary", use_container_width=True):
+                switch_active_client(cid)
+                st.session_state.view_mode = "cliente"
+                st.session_state.user_role = "cliente"
+                st.rerun()
+
+        # Tabs de Inspección
+        tab_resumen, tab_chat, tab_gestion = st.tabs([
+            "🧠 **Resumen IA & Auditoría**",
+            "💬 **Transcripción en Vivo**",
+            "⚡ **Acciones de Resolución**"
+        ])
+
+        # TAB 1: RESUMEN EJECUTIVO IA Y AUDITORÍA
+        with tab_resumen:
+            # Tarjeta de Resumen Ejecutivo por IA
+            res_ia_texto = ai_exec.get("resumen_texto") or t_sel.get("summary") or "Consulta por variación de recibo."
+            sentimiento_ia = ai_exec.get("sentimiento", "CONSULTIVO")
+            sugerencia_ia = ai_exec.get("sugerencia_asesor", "Aclarar motivo de cobro y ofrecer facilidades.")
+
+            st.markdown(f"""
+            <div style="background: {theme['bg_card_header']}; border: 1px solid {theme['border']}; border-radius: 14px; padding: 14px 18px; margin-bottom: 12px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                    <div style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: {theme['highlight']};">
+                        <span>🤖</span> Resumen Ejecutivo para el Asesor (Yara AI)
+                    </div>
+                    <span style="background: #e0f2fe; color: #0284c7; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 9999px;">
+                        Sentimiento: {sentimiento_ia}
                     </span>
+                </div>
+                <p style="font-size: 13px; color: {theme['text_primary']}; line-height: 1.45; margin: 0 0 8px 0;">
+                    {res_ia_texto}
+                </p>
+                <div style="font-size: 12px; color: {theme['text_secondary']}; background: {theme['bg_card']}; padding: 8px 12px; border-radius: 8px; border-left: 3px solid #16a34a;">
+                    💡 <strong>Sugerencia de Resolución:</strong> {sugerencia_ia}
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
-
-            f_c1, f_c2 = st.columns(2)
-            with f_c1:
-                var_m = diff_audit.get("variacion", {}).get("monto", 0.0)
-                signo_v = "+" if var_m > 0 else ""
-                col_v = "#ff6a00" if var_m > 0 else "#00a650"
+            # Bento Grid Financiero
+            f1, f2 = st.columns(2)
+            with f1:
+                r_act = float(cliente_meta.get("recibo_actual", 119.90))
+                r_ant = float(cliente_meta.get("recibo_anterior", 89.90))
+                delta_m = round(r_act - r_ant, 2)
+                signo = "+" if delta_m > 0 else ""
                 st.markdown(f"""
-                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px;">
-                    <div style="font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase;">Recibo Auditado (Julio)</div>
-                    <div style="font-size: 18px; font-weight: 800; color: #0a2540; margin-top: 4px;">
-                        S/ {cliente_meta['recibo_actual']:.2f} <span style="font-size: 13px; color: {col_v}; font-weight: 700;">({signo_v}S/ {var_m:.2f})</span>
+                <div style="background: {theme['bg_card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 12px 14px;">
+                    <div style="font-size: 11px; color: {theme['text_secondary']}; font-weight: 700; text-transform: uppercase;">Variación Auditada (Julio vs Junio)</div>
+                    <div style="font-size: 18px; font-weight: 800; color: {theme['text_primary']}; margin-top: 4px;">
+                        S/ {r_act:.2f} <span style="font-size: 13px; color: {'#dc2626' if delta_m > 0 else '#16a34a'}; font-weight: 700;">({signo}S/ {delta_m:.2f})</span>
+                    </div>
+                    <div style="font-size: 12px; color: {theme['text_secondary']}; margin-top: 2px;">
+                        Motivo: <strong>{cliente_meta.get('motivo_principal')}</strong>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
-
-            with f_c2:
-                eleg_mt = nbo_data.get("es_elegible_mt", False)
+            with f2:
+                nbo_of = nbo_data.get("oferta_recomendada", {})
+                ahorro_nbo = nbo_data.get("beneficio_economico", {}).get("ahorro_mensual_soles", 0.0)
                 st.markdown(f"""
-                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px;">
-                    <div style="font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase;">Elegibilidad NBO Movistar Total</div>
-                    <div style="font-size: 16px; font-weight: 800; color: {'#00a650' if eleg_mt else '#64748b'}; margin-top: 4px;">
-                        {'⭐ Elegible para Blindaje' if eleg_mt else 'Plan Optimizado'}
+                <div style="background: {theme['bg_card']}; border: 1px solid {theme['border']}; border-radius: 12px; padding: 12px 14px;">
+                    <div style="font-size: 11px; color: {theme['text_secondary']}; font-weight: 700; text-transform: uppercase;">Propuesta Comercial NBO</div>
+                    <div style="font-size: 15px; font-weight: 800; color: {theme['highlight']}; margin-top: 4px;">
+                        {nbo_of.get('nombre_oferta', 'Movistar Total')}
+                    </div>
+                    <div style="font-size: 12px; color: #16a34a; font-weight: 700; margin-top: 2px;">
+                        Ahorro mensual potencial: S/ {ahorro_nbo:.2f}/mes
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
-
-            st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
-            conceptos = diff_audit.get("conceptos_adicionales", [])
-            if conceptos:
-                st.markdown("##### 🔍 Conceptos de Variación Detectados:")
-                for c in conceptos:
-                    st.caption(f"• **{c.get('concepto')}**: +S/ {c.get('monto', 0.0):.2f} (`{c.get('tipo')}`)")
 
         # TAB 2: TRANSCRIPCIÓN DEL CHAT
-        with tab2:
-            st.markdown("##### 📜 Transcripción Completa del Asistente")
-            chat_container = st.container(height=280)
+        with tab_chat:
+            st.markdown(f"<div style='font-size: 13px; font-weight: 700; color: {theme['text_primary']}; margin-bottom: 6px;'>💬 Historial de Conversación en Vivo</div>", unsafe_allow_html=True)
+            
+            chat_container = st.container(height=260)
             with chat_container:
                 history_list = t_sel.get("chat_history", [])
                 if not history_list:
-                    st.caption("Sin mensajes previos registrados.")
+                    st.caption("Sin mensajes previos registrados en el chat.")
                 for m in history_list:
                     role = m.get("role", "user")
                     content = m.get("content", "")
                     if role == "user":
-                        with st.chat_message("user"):
-                            st.markdown(f"**👤 Cliente:** {content}")
+                        st.markdown(f"""
+                        <div style="display: flex; justify-content: flex-start; margin-bottom: 8px;">
+                            <div style="background: #00639c; color: #ffffff; border-radius: 14px; padding: 8px 14px; font-size: 13px; max-width: 85%;">
+                                <strong>👤 Cliente:</strong> {content}
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
                     elif role == "advisor":
-                        with st.chat_message("assistant"):
-                            st.markdown(f"**👔 Asesor Humano:** {content}")
+                        st.markdown(f"""
+                        <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
+                            <div style="background: #16a34a; color: #ffffff; border-radius: 14px; padding: 8px 14px; font-size: 13px; max-width: 85%;">
+                                <strong>👔 Asesor Carlos Vega:</strong> {content}
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
                     else:
-                        with st.chat_message("assistant"):
-                            st.markdown(f"**🤖 Yara AI:** {content}")
+                        st.markdown(f"""
+                        <div style="display: flex; justify-content: flex-start; margin-bottom: 8px;">
+                            <div style="background: {theme['bg_card_header']}; color: {theme['text_primary']}; border: 1px solid {theme['border']}; border-radius: 14px; padding: 8px 14px; font-size: 13px; max-width: 85%;">
+                                <strong>🤖 Yara AI:</strong> {content}
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
 
-            # Responder al cliente
-            st.markdown("##### ✍️ Enviar Mensaje al Cliente:")
+            # Responder directamente al chat del cliente
+            st.markdown(f"<div style='font-size: 12px; font-weight: 700; color: {theme['text_secondary']}; margin-top: 8px;'>✍️ Responder al Cliente en su Chat:</div>", unsafe_allow_html=True)
             col_msg_in, col_msg_btn = st.columns([3.5, 1.0])
             with col_msg_in:
-                msg_asesor = st.text_input("Respuesta:", placeholder="Ej: Hola, autoricé la anulación del cargo...", key=f"inp_msg_{t_id}")
+                msg_asesor = st.text_input("Respuesta:", placeholder="Ej: Hola, revisé tu caso y he autorizado el fraccionamiento...", key=f"inp_msg_{t_id}", label_visibility="collapsed")
             with col_msg_btn:
-                st.write("")
-                if st.button("💬 Enviar", key=f"btn_send_{t_id}", use_container_width=True):
+                if st.button("💬 Enviar", key=f"btn_send_{t_id}", type="primary", use_container_width=True):
                     if msg_asesor.strip():
                         t_sel["chat_history"].append({
                             "role": "advisor",
@@ -285,48 +366,48 @@ def render_trabajador_view():
                             "metadata": {"timestamp": datetime.now().strftime("%H:%M"), "asesor": "Carlos Vega"}
                         })
                         add_chat_message("assistant", f"👔 **Asesor Carlos Vega:** {msg_asesor.strip()}")
-                        st.success("Mensaje enviado con éxito.")
+                        st.success("Mensaje sincronizado con el cliente.")
                         st.rerun()
 
-        # TAB 3: GESTIÓN Y RESOLUCIÓN
-        with tab3:
+        # TAB 3: ACCIONES DE RESOLUCIÓN INMEDIATA
+        with tab_gestion:
             st.markdown(f"""
-            <div style="background: #fff7ed; border-left: 4px solid #ff6a00; border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #9a3412; margin-bottom: 14px;">
-                <strong>Motivo Registrado:</strong> {t_sel.get('reason')}<br>
-                <strong>Resumen IA:</strong> {t_sel.get('summary', 'Revisión técnica de facturación solicitada por el cliente.')}
+            <div style="background: {theme['bg_card_header']}; border-radius: 10px; padding: 12px 16px; font-size: 13px; margin-bottom: 12px;">
+                <strong>Estado del Caso:</strong> <code>{t_sel.get('status')}</code> | <strong>Prioridad:</strong> <code>{t_sel.get('priority')}</code>
             </div>
             """, unsafe_allow_html=True)
 
-            col_s1, col_s2 = st.columns([1.5, 2.5])
+            col_s1, col_s2 = st.columns([1.4, 2.6])
             with col_s1:
                 cur_status = t_sel.get("status", "PENDIENTE")
                 nuevo_st = st.selectbox(
-                    "Estado del Ticket:",
+                    "Actualizar Estado:",
                     ["PENDIENTE", "EN_ATENCION", "RESUELTO"],
                     index=["PENDIENTE", "EN_ATENCION", "RESUELTO"].index(cur_status) if cur_status in ["PENDIENTE", "EN_ATENCION", "RESUELTO"] else 0,
                     key=f"sel_st_{t_id}"
                 )
             with col_s2:
-                notas = st.text_input("Notas de Cierre:", value=t_sel.get("notes", ""), key=f"inp_notes_{t_id}")
+                notas = st.text_input("Notas de Resolución:", value=t_sel.get("notes", ""), key=f"inp_notes_{t_id}")
 
-            if st.button("💾 Guardar Actualización", type="primary", key=f"btn_save_{t_id}", use_container_width=True):
+            if st.button("💾 Guardar Gestión", key=f"btn_save_crm_{t_id}", type="secondary", use_container_width=True):
                 update_ticket_status(t_id, nuevo_st, notas, agent="Carlos Vega")
-                st.success(f"Ticket {t_id} actualizado a {nuevo_st}.")
+                st.success(f"Ticket {t_id} actualizado.")
                 st.rerun()
 
             st.markdown("---")
-            st.markdown("##### ⚡ Acciones Rápidas de Retención:")
-            a_col1, a_col2 = st.columns(2)
-            with a_col1:
-                if st.button("💳 Aprobar Fraccionamiento 6 Cuotas", key=f"btn_act_fracc_{t_id}", use_container_width=True):
-                    update_ticket_status(t_id, "RESUELTO", "Fraccionamiento de 6 cuotas aprobado.")
+            st.markdown(f"<div style='font-size: 13px; font-weight: 700; color: {theme['text_primary']}; margin-bottom: 6px;'>⚡ Acciones Rápidas del Asesor:</div>", unsafe_allow_html=True)
+            
+            act_col1, act_col2 = st.columns(2)
+            with act_col1:
+                if st.button("💳 Aprobar Fraccionamiento (6 cuotas)", key=f"btn_act_f_{t_id}", use_container_width=True):
+                    update_ticket_status(t_id, "RESUELTO", "Fraccionamiento de 6 cuotas aprobado por asesor.")
                     add_chat_message("assistant", "👔 **Asesor Carlos Vega:** He aprobado el fraccionamiento de tu recibo en 6 cuotas fijas sin intereses.")
-                    st.success("Fraccionamiento autorizado.")
+                    st.success("Fraccionamiento autorizado y notificado al chat.")
                     st.rerun()
-            with a_col2:
-                if st.button("🚀 Aplicar Upgrade Movistar Total", key=f"btn_act_mt_{t_id}", use_container_width=True):
-                    of_nbo = nbo_data.get("oferta_recomendada", {})
-                    update_ticket_status(t_id, "RESUELTO", f"Upgrade a {of_nbo.get('nombre_oferta', 'Movistar Total')} aplicado.")
-                    add_chat_message("assistant", f"👔 **Asesor Carlos Vega:** He gestionado tu migración a {of_nbo.get('nombre_oferta', 'Movistar Total')} con descuento.")
-                    st.success("Upgrade a Movistar Total aplicado.")
+            with act_col2:
+                if st.button("💵 Aplicar Nota de Crédito S/ 20", key=f"btn_act_nc_{t_id}", use_container_width=True):
+                    update_ticket_status(t_id, "RESUELTO", "Nota de crédito de S/ 20.00 aprobada por fidelización.")
+                    add_chat_message("assistant", "👔 **Asesor Carlos Vega:** He emitido una Nota de Crédito por **S/ 20.00** a tu favor para regularizar tu saldo.")
+                    st.success("Nota de crédito registrada con éxito.")
                     st.rerun()
+
