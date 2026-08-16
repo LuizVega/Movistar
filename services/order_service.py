@@ -268,7 +268,52 @@ def ejecutar_pago_recibo(
     }
 
 
+def ejecutar_registro_consulta(
+    cliente_id: str,
+    motivo: str = "Consulta de Variación de Recibo",
+    resumen: str = "Detalle de conceptos auditados por Yara AI",
+    canal: str = "YARA_AI"
+) -> Dict[str, Any]:
+    """
+    Registra formalmente una consulta del cliente generando un código de atención auditable.
+    """
+    cid = str(cliente_id).strip().upper()
+    consulta_id = generar_id_orden("CNS")
+    fechas = calcular_fechas_ciclo()
+    cliente_meta = CLIENTES_CATALOGO.get(cid, {"nombre": f"Cliente {cid}"})
+
+    from database import insert_consulta_registrada
+    consulta_data = {
+        "consulta_id": consulta_id,
+        "cliente_id": cid,
+        "motivo": motivo,
+        "resumen": resumen,
+        "canal": canal,
+        "fecha_registro": fechas["fecha_registro"],
+        "estado": "REGISTRADA"
+    }
+    insert_consulta_registrada(consulta_data)
+
+    registrar_en_ordenes_csv(
+        cliente_id=cid,
+        motivo_desc=f"Registro de consulta: {motivo}",
+        item_tipo="Registro Consulta"
+    )
+
+    return {
+        "exito": True,
+        "consulta_id": consulta_id,
+        "cliente_id": cid,
+        "cliente_nombre": cliente_meta["nombre"],
+        "motivo": motivo,
+        "resumen": resumen,
+        "fecha_registro": fechas["fecha_registro"],
+        "estado": "REGISTRADA"
+    }
+
+
 def consultar_ordenes_cliente(cliente_id: str) -> List[Dict[str, Any]]:
     """Consulta todas las órdenes registradas de un cliente."""
     return get_ordenes_por_cliente(cliente_id)
+
 

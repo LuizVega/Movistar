@@ -105,12 +105,27 @@ def create_schema(conn: sqlite3.Connection, drop_existing: bool = False) -> None
     );
     """)
 
+    # 5. Tabla Consultas Registradas (trazabilidad y comprobantes de atención)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS consultas_registradas (
+        consulta_id TEXT PRIMARY KEY,
+        cliente_id TEXT NOT NULL,
+        motivo TEXT NOT NULL,
+        resumen TEXT NOT NULL,
+        canal TEXT NOT NULL,
+        fecha_registro TEXT NOT NULL,
+        estado TEXT NOT NULL
+    );
+    """)
+
     # Creación de Índices para optimizar consultas de filtrado por cliente_id y oferta_id
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientes_cliente_id ON clientes (cliente_id);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientes_oferta_hogar_id ON clientes (oferta_hogar_id);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientes_elegible_mt ON clientes (elegible_mt);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientes_es_movistar_total ON clientes (es_movistar_total);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientes_tipo ON clientes (tipo_cliente);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_consultas_cliente_id ON consultas_registradas (cliente_id);")
+
 
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_ofertas_oferta_id ON catalogo_ofertas (oferta_id);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_ofertas_tipo ON catalogo_ofertas (tipo_oferta);")
@@ -309,7 +324,58 @@ def get_ordenes_por_cliente(cliente_id: Any, conn: Optional[sqlite3.Connection] 
             conn.close()
 
 
+def insert_consulta_registrada(consulta_data: Dict[str, Any], conn: Optional[sqlite3.Connection] = None) -> bool:
+    """Inserta el registro de una consulta formal de cliente."""
+    close_after = False
+    if conn is None:
+        conn = get_connection()
+        close_after = True
+
+    try:
+        create_schema(conn)
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT OR REPLACE INTO consultas_registradas (
+                consulta_id, cliente_id, motivo, resumen, canal, fecha_registro, estado
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            consulta_data["consulta_id"],
+            str(consulta_data["cliente_id"]),
+            consulta_data.get("motivo", "Consulta de Recibo"),
+            consulta_data.get("resumen", ""),
+            consulta_data.get("canal", "YARA_AI"),
+            consulta_data.get("fecha_registro", ""),
+            consulta_data.get("estado", "REGISTRADA")
+        ))
+        conn.commit()
+        return True
+    finally:
+        if close_after:
+            conn.close()
+
+
+def get_consultas_por_cliente(cliente_id: Any, conn: Optional[sqlite3.Connection] = None) -> List[Dict[str, Any]]:
+    """Retorna las consultas registradas de un cliente."""
+    close_after = False
+    if conn is None:
+        conn = get_connection()
+        close_after = True
+
+    try:
+        create_schema(conn)
+        cursor = conn.execute("""
+            SELECT * FROM consultas_registradas
+            WHERE cliente_id = ?
+            ORDER BY fecha_registro DESC
+        """, (str(cliente_id),))
+        return [dict(row) for row in cursor.fetchall()]
+    finally:
+        if close_after:
+            conn.close()
+
+
 if __name__ == "__main__":
+
     conn = get_connection()
     create_schema(conn)
     counts = get_table_counts(conn)

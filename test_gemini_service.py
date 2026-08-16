@@ -77,6 +77,34 @@ class TestGeminiService(unittest.TestCase):
         self.assertIn("TCK-", res["response_text"])
         self.assertEqual(res["action_payload"]["action"], "TRIGGER_ESCALATION")
 
+    def test_efecto_efervescente(self):
+        """Valida que al agradecer/finalizar la conversación, la IA recuerde los beneficios activos del plan."""
+        client_ctx = CLIENTES_CATALOGO["CLI001"]
+        prompt = "Muchas gracias, ya entendí todo claro"
+        res = get_gemini_response(
+            chat_history=[
+                {"role": "user", "content": "¿Por qué subió mi recibo?"},
+                {"role": "assistant", "content": "Subió por el repetidor WiFi."}
+            ],
+            user_message=prompt,
+            client_context=client_ctx
+        )
+        self.assertIn("response_text", res)
+        # Debe contener tono de despedida y mención de beneficios o deseos positivos
+        self.assertTrue(any(k in res["response_text"].lower() for k in ["placer", "gusto", "recuerda", "plan", "fibra", "excelente día", "de nada"]))
+
+    def test_action_hub_en_variacion(self):
+        """Valida que ante preguntas de variación de recibo, se retorne el payload del hub de acciones."""
+        client_ctx = CLIENTES_CATALOGO["CLI001"]
+        prompt = "¿Por qué me vino más caro este mes?"
+        res = get_gemini_response(
+            chat_history=[],
+            user_message=prompt,
+            client_context=client_ctx
+        )
+        self.assertIn("action_payload", res)
+        self.assertIn(res["action_payload"]["action"], ["SHOW_ACTIONS_HUB", "SHOW_BILLING_BREAKDOWN"])
+
     def test_system_prompt_maestro(self):
         """Valida que el System Prompt contenga las directivas de Yara AI y 0% alucinaciones."""
         self.assertIn("YARA AI", YARA_SYSTEM_PROMPT)
@@ -85,4 +113,5 @@ class TestGeminiService(unittest.TestCase):
 
 
 if __name__ == "__main__":
+
     unittest.main()

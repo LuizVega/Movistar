@@ -25,7 +25,7 @@ from typing import Dict, Any, List, Optional, Tuple
 # Base de Datos de Facturación y Datos Tabulares de Referencia
 # =========================================================
 
-# Repositorio de recibos para simulación / benchmark Dify
+# Repositorio de recibos para simulación / benchmark Dify y auditoría analítica
 TABULAR_RECIBOS_REGISTRY: Dict[str, Dict[str, Dict[str, Any]]] = {
     "CLI001": {
         "2026-06": {
@@ -47,7 +47,7 @@ TABULAR_RECIBOS_REGISTRY: Dict[str, Dict[str, Dict[str, Any]]] = {
             "total": 109.90,
             "conceptos": [
                 {"concepto": "Plan Fibra 1000", "monto": 129.90, "tipo": "cargo_fijo"},
-                {"concepto": "Descuento promocional", "monto": -20.00, "tipo": "descuento"}
+                {"concepto": "Descuento promocional bienvenida", "monto": -20.00, "tipo": "descuento"}
             ]
         },
         "2026-07": {
@@ -116,6 +116,65 @@ TABULAR_RECIBOS_REGISTRY: Dict[str, Dict[str, Dict[str, Any]]] = {
                 {"concepto": "Cargo por Reconexión tras corte moroso", "monto": 10.50, "tipo": "cargo_reconexion"}
             ]
         }
+    },
+    "CLI007": {
+        "2026-06": {
+            "total": 65.00,
+            "conceptos": [
+                {"concepto": "Plan Fibra 200", "monto": 65.00, "tipo": "cargo_fijo"}
+            ]
+        },
+        "2026-07": {
+            "total": 85.00,
+            "conceptos": [
+                {"concepto": "Plan Fibra 200", "monto": 65.00, "tipo": "cargo_fijo"},
+                {"concepto": "Compra de Paquete Bloque TV HD + 10GB", "monto": 20.00, "tipo": "compra_paquetes"}
+            ]
+        }
+    },
+    "CLI008": {
+        "2026-06": {
+            "total": 95.00,
+            "conceptos": [
+                {"concepto": "Plan Fibra 500", "monto": 95.00, "tipo": "cargo_fijo"}
+            ]
+        },
+        "2026-07": {
+            "total": 75.00,
+            "conceptos": [
+                {"concepto": "Plan Fibra 500", "monto": 95.00, "tipo": "cargo_fijo"},
+                {"concepto": "Nota de Crédito por Ajuste de Facturación", "monto": -20.00, "tipo": "nota_credito"}
+            ]
+        }
+    },
+    "CLI009": {
+        "2026-06": {
+            "total": 79.90,
+            "conceptos": [
+                {"concepto": "Plan Fibra 300", "monto": 79.90, "tipo": "cargo_fijo"}
+            ]
+        },
+        "2026-07": {
+            "total": 109.90,
+            "conceptos": [
+                {"concepto": "Plan Fibra 1000 (Cambio de Plan)", "monto": 109.90, "tipo": "cambio_plan"}
+            ]
+        }
+    },
+    "1000001": {
+        "2026-06": {
+            "total": 129.90,
+            "conceptos": [
+                {"concepto": "Trío Clásico 100 Mbps", "monto": 139.90, "tipo": "cargo_fijo"},
+                {"concepto": "Descuento Fidelización 10%", "monto": -10.00, "tipo": "descuento"}
+            ]
+        },
+        "2026-07": {
+            "total": 139.90,
+            "conceptos": [
+                {"concepto": "Trío Clásico 100 Mbps", "monto": 139.90, "tipo": "cargo_fijo"}
+            ]
+        }
     }
 }
 
@@ -151,8 +210,16 @@ def calcular_periodo_anterior(periodo: str) -> Optional[str]:
 
 def clasificar_tipo_concepto(concepto_nombre: str, code_id: str = "", grupo: str = "", subgrupo: str = "", monto: float = 0.0) -> str:
     """
-    Clasifica automáticamente la causa del concepto de facturación según las reglas de negocio
-    de Movistar / Telecom Challenge.
+    Clasifica automáticamente la causa del concepto de facturación según las 8 reglas analíticas
+    de Movistar / Telecom Challenge:
+    1. cambio_plan: Cambio de plan o tarifa
+    2. cuota_equipo: Cuota de equipo financiado (ShEq)
+    3. compra_paquetes: Paquetes de datos, SVA, bloques TV o bonos
+    4. cargo_unico: Cargos únicos de instalación o activación
+    5. fin_descuento: Expiración de promociones y descuentos
+    6. nota_credito: Notas de crédito y débito por ajustes
+    7. prorrateo: Prorrateos por altas o cambios de ciclo
+    8. cargo_reconexion: Reconexión o suspensión morosa
     """
     text_full = f"{concepto_nombre} {code_id} {grupo} {subgrupo}".lower()
 
@@ -165,22 +232,31 @@ def clasificar_tipo_concepto(concepto_nombre: str, code_id: str = "", grupo: str
         return "cuota_equipo"
 
     # 3. Cargos por reconexión tras corte/suspensión morosa
-    if any(k in text_full for k in ["reconexion", "reconexión", "oc1_reconexion", "cargo por reconexion", "cargo por reconexión"]):
+    if any(k in text_full for k in ["reconexion", "reconexión", "oc1_reconexion", "cargo por reconexion", "cargo por reconexión", "suspension", "suspensión"]):
         return "cargo_reconexion"
 
-    # 4. Descuentos y promociones
-    if any(k in text_full for k in ["descuento", "bono", "promocion", "promoción", "rc_plan", "rcd_bon", "bonpaq"]):
+    # 4. Notas de Crédito / Débito y Ajustes
+    if any(k in text_full for k in ["nota de credito", "nota de crédito", "nota de debito", "nota de débito", "ajuste de facturacion", "ajuste de facturación", "reclamo", "regularizacion", "regularización", "dsc"]):
+        return "nota_credito" if monto <= 0 else "nota_debito"
+
+    # 5. Descuentos y promociones (Fin de descuento si monto > 0 o si expiró)
+    if any(k in text_full for k in ["descuento", "bono", "promocion", "promoción", "rc_plan", "rcd_bon", "bonpaq", "fidelizacion", "fidelización"]):
         return "fin_descuento" if monto > 0 else "descuento"
 
-    # 5. Cargos únicos de instalación o activación
-    if any(k in text_full for k in ["instalacion", "instalación", "repetidor", "cargo_unico", "cargo único", "visita tecnica", "alta"]):
+    # 6. Cargos únicos de instalación o activación
+    if any(k in text_full for k in ["instalacion", "instalación", "repetidor", "cargo_unico", "cargo único", "visita tecnica", "visita técnica", "alta"]):
         return "cargo_unico"
 
-    # 6. Servicios adicionales o paquetes
-    if any(k in text_full for k in ["paquete", "sva", "bloque tv", "adicional", "trafico adicional", "gigas"]):
-        return "servicio_adicional"
+    # 7. Compra de paquetes adicionales o SVA
+    if any(k in text_full for k in ["paquete", "sva", "bloque tv", "adicional", "trafico adicional", "gigas extra", "compra"]):
+        return "compra_paquetes"
+
+    # 8. Cambio de plan / Migración
+    if any(k in text_full for k in ["cambio de plan", "upgrade", "migracion", "migración"]):
+        return "cambio_plan"
 
     return "cargo_adicional"
+
 
 
 def extraer_recibo_desde_csv(id_cliente: str, periodo: str) -> Optional[Dict[str, Any]]:

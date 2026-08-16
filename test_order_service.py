@@ -74,6 +74,26 @@ class TestOrderService(unittest.TestCase):
         ordenes_db = consultar_ordenes_cliente(cid)
         self.assertTrue(any(o["orden_id"] == res["orden_id"] for o in ordenes_db))
 
+    def test_ejecutar_pago_recibo(self):
+        """Valida el procesamiento y registro inmediato de pago de recibo."""
+        from services.order_service import ejecutar_pago_recibo
+        cid = "CLI001"
+        res = ejecutar_pago_recibo(cid, monto=119.90)
+        self.assertTrue(res["exito"])
+        self.assertTrue(res["transaccion_id"].startswith("PAG-"))
+        self.assertEqual(res["monto_pagado"], 119.90)
+        self.assertEqual(res["estado"], "PAGADO_EXITOSO")
+
+    def test_ejecutar_registro_consulta(self):
+        """Valida el registro de consultas formales con código de gestión."""
+        from services.order_service import ejecutar_registro_consulta
+        cid = "CLI001"
+        res = ejecutar_registro_consulta(cid, motivo="Variación Repetidor", resumen="Auditado S/ 30.00")
+        self.assertTrue(res["exito"])
+        self.assertTrue(res["consulta_id"].startswith("CNS-"))
+        self.assertEqual(res["estado"], "REGISTRADA")
+
 
 if __name__ == "__main__":
+
     unittest.main()

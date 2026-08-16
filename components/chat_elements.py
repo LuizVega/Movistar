@@ -9,9 +9,10 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 from state_manager import add_chat_message, CLIENTES_CATALOGO
 from services.escalation_service import escalar_a_humano
-from services.order_service import ejecutar_upgrade_plan, ejecutar_fraccionamiento_deuda, ejecutar_pago_recibo
+from services.order_service import ejecutar_upgrade_plan, ejecutar_fraccionamiento_deuda, ejecutar_pago_recibo, ejecutar_registro_consulta
 from nbo_engine import generar_next_best_offer
 from diff_engine import auditar_variacion_recibo
+
 
 YARA_AVATAR_URL = "https://lh3.googleusercontent.com/aida-public/AB6AXuAK6qFdc2J_wKYqG2JmJHwr75_UuOq6HvRDxGPSGW7ElnZd8r0-Vq9MMRNS6TAsAaOd698fjpeVi5thubsxcuEDYCvxKRdD_udnIjO9xOJz8znzK6aVbwYHrxq2OpzJUnVEyAU9igi_ZSVuL3WvmklqJtp6OddNlV50r3vjjFOCF8krxLLgg-faEEmuIHHBoEIfgdujI-dxoWjKzh-1RBP1XLf5GOulW8hbi_2lIsIaf_jhfMwVSOXQ7g"
 
@@ -188,9 +189,70 @@ def render_chat_action_elements(msg: Dict[str, Any], msg_idx: int, client_contex
     if action_type == "SHOW_DASHBOARD":
         render_client_dashboard_card(client_context)
 
-    # 2. Si la acción recomendada es mostrar el Desglose de Facturación
-    elif action_type == "SHOW_BILLING_BREAKDOWN":
+    # 2. Si la acción recomendada es mostrar el Desglose de Facturación o el Hub de Acciones
+    elif action_type in ["SHOW_BILLING_BREAKDOWN", "SHOW_ACTIONS_HUB"]:
         render_bento_billing_card(client_context)
+
+        if not is_executed:
+            st.markdown(f"""
+            <div style="margin: 6px 0 8px 48px; font-size: 12px; font-weight: 600; color: {theme['text_secondary']};">
+                ⚡ Siguientes acciones recomendadas:
+            </div>
+            """, unsafe_allow_html=True)
+
+            nbo_data = action_payload.get("nbo")
+            puede_cs = action_payload.get("puede_cross_selling", False)
+
+            col_a1, col_a2, col_a3, col_a4 = st.columns([1.1, 1.3, 1.2, 1.1])
+            with col_a1:
+                if st.button("💳 Pagar", key=f"btn_act_pay_{msg_idx}", type="primary", use_container_width=True):
+                    st.session_state[action_executed_key] = True
+                    res_pago = ejecutar_pago_recibo(cid, recibo_actual)
+                    add_chat_message(
+                        role="assistant",
+                        content=f"✅ **Pago Registrado.** Comprobante `{res_pago['transaccion_id']}` por **S/ {res_pago['monto_pagado']:.2f}** vía Pasarela Digital Movistar. Tu recibo está al día."
+                    )
+                    st.rerun()
+            with col_a2:
+                if st.button("📝 Registrar Consulta", key=f"btn_act_reg_{msg_idx}", use_container_width=True):
+                    st.session_state[action_executed_key] = True
+                    motivo = client_context.get("motivo_principal", "Consulta de Recibo")
+                    res_cns = ejecutar_registro_consulta(cid, motivo=motivo, resumen=msg.get("content", ""))
+                    add_chat_message(
+                        role="assistant",
+                        content=f"📝 **Consulta Registrada.** Tu código de gestión es **`{res_cns['consulta_id']}`** para seguimiento en Mi Movistar."
+                    )
+                    st.rerun()
+            with col_a3:
+                if puede_cs:
+                    if st.button("⭐ Alternativas", key=f"btn_act_cs_{msg_idx}", use_container_width=True):
+                        st.session_state[action_executed_key] = True
+                        nbo = nbo_data or generar_next_best_offer(cid)
+                        add_chat_message(
+                            role="assistant",
+                            content=f"Te comparto la alternativa de ahorro con **{nbo.get('oferta_recomendada', {}).get('nombre_oferta', 'Movistar Total')}**:",
+                            metadata={"action_payload": {"action": "SHOW_UPGRADE_CARD", "nbo": nbo}}
+                        )
+                        st.rerun()
+                else:
+                    if st.button("💳 Fraccionar", key=f"btn_act_fracc_{msg_idx}", use_container_width=True):
+                        st.session_state[action_executed_key] = True
+                        res_fracc = ejecutar_fraccionamiento_deuda(cid, 6, recibo_actual)
+                        add_chat_message(
+                            role="assistant",
+                            content=f"🎉 **Fraccionamiento Aprobado.** Solicitud `{res_fracc['solicitud_id']}` procesada en 6 cuotas de **S/ {res_fracc['monto_cuota']:.2f}/mes** al 0% TCEA."
+                        )
+                        st.rerun()
+            with col_a4:
+                if st.button("👨‍💼 Asesor", key=f"btn_act_adv_{msg_idx}", use_container_width=True):
+                    st.session_state[action_executed_key] = True
+                    ticket = escalar_a_humano(cid, st.session_state.get("chat_history", []), f"Derivación desde consulta de recibo ({client_context.get('motivo_principal', '')})")
+                    add_chat_message(
+                        role="assistant",
+                        content=f"🔔 **He derivado tu caso a un asesor senior.** Ticket CRM: **`{ticket['ticket_id']}`** con todo el historial y detalle auditado."
+                    )
+                    st.rerun()
+
 
     # 3. Si la acción recomendada es Propuesta de Movistar Total
     elif action_type in ["SHOW_UPGRADE_CARD", "UPGRADE_MOVISTAR_TOTAL"]:

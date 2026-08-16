@@ -8,7 +8,7 @@ from typing import Dict, Any, List, Optional
 import streamlit as st
 
 
-# Catálogo de Clientes de Demostración con perfiles representativos
+# Catálogo de Clientes de Demostración con perfiles representativos y causales analíticas
 CLIENTES_CATALOGO = {
     "CLI001": {
         "id": "CLI001",
@@ -21,8 +21,10 @@ CLIENTES_CATALOGO = {
         "recibo_anterior": 89.90,
         "recibo_actual": 119.90,
         "diferencia": 30.00,
+        "tipo_causa": "cargo_unico",
         "motivo_principal": "Instalación de repetidor WiFi",
         "detalle_variacion": "Cargo único de S/ 30.00 por instalación de repetidor Smart WiFi solicitado en Junio.",
+        "beneficios_actuales": "600 Mbps simétricos de fibra, repetidor Smart WiFi activo y llamadas ilimitadas a todo destino.",
         "antiguedad": "18 meses",
         "region": "Lima - San Isidro",
         "lineas_moviles_activas": 1
@@ -38,8 +40,10 @@ CLIENTES_CATALOGO = {
         "recibo_anterior": 129.90,
         "recibo_actual": 139.90,
         "diferencia": 10.00,
+        "tipo_causa": "fin_descuento",
         "motivo_principal": "Fin de promoción de descuento",
         "detalle_variacion": "Vencimiento del 10% de descuento comercial aplicado durante 6 meses.",
+        "beneficios_actuales": "Internet ilimitado para el hogar con estabilidad garantizada y soporte prioritario.",
         "antiguedad": "24 meses",
         "region": "Lima - Miraflores",
         "lineas_moviles_activas": 0
@@ -55,11 +59,32 @@ CLIENTES_CATALOGO = {
         "recibo_anterior": 149.90,
         "recibo_actual": 179.90,
         "diferencia": 30.00,
+        "tipo_causa": "fin_descuento",
         "motivo_principal": "Fin de descuento de bienvenida",
         "detalle_variacion": "Culminación de descuento promocional de bienvenida de S/ 30.00.",
+        "beneficios_actuales": "Velocidad ultra rápida de 1000 Mbps con baja latencia ideal para streaming y gaming.",
         "antiguedad": "7 meses",
         "region": "Lima - Surco",
         "lineas_moviles_activas": 2
+    },
+    "CLI003": {
+        "id": "CLI003",
+        "nombre": "Carlos Ruiz",
+        "servicio": "Plan Fibra 400 Mbps",
+        "plan_actual": "Plan Fibra 400 Mbps",
+        "tipo_servicio": "HOGAR",
+        "telefono_movil": "945678123",
+        "estado_linea_movil": "ACTIVA",
+        "recibo_anterior": 69.90,
+        "recibo_actual": 69.90,
+        "diferencia": 0.00,
+        "tipo_causa": "sin_variacion",
+        "motivo_principal": "Facturación normal sin variación",
+        "detalle_variacion": "Tu recibo mantiene la tarifa regular sin cobros adicionales.",
+        "beneficios_actuales": "400 Mbps de fibra simétrica y acceso a la app Mi Movistar para gestión 24/7.",
+        "antiguedad": "12 meses",
+        "region": "Lima - Pueblo Libre",
+        "lineas_moviles_activas": 1
     },
     "CLI004": {
         "id": "CLI004",
@@ -72,8 +97,10 @@ CLIENTES_CATALOGO = {
         "recibo_anterior": 69.90,
         "recibo_actual": 94.90,
         "diferencia": 25.00,
+        "tipo_causa": "prorrateo",
         "motivo_principal": "Prorrateo por alta a mitad de ciclo",
         "detalle_variacion": "Cobro de días proporcionales por activación el día 12 del ciclo de facturación.",
+        "beneficios_actuales": "300 Mbps estables en casa y llamadas ilimitadas a fijos nacionales.",
         "antiguedad": "1 mes",
         "region": "Arequipa",
         "lineas_moviles_activas": 1
@@ -89,8 +116,10 @@ CLIENTES_CATALOGO = {
         "recibo_anterior": 55.90,
         "recibo_actual": 90.90,
         "diferencia": 35.00,
+        "tipo_causa": "cuota_equipo",
         "motivo_principal": "Cuota 3/12 de equipo financiado",
         "detalle_variacion": "Cuota mensual por adquisición financiada de smartphone Samsung Galaxy.",
+        "beneficios_actuales": "65GB de alta velocidad, minutos ilimitados y cobertura 4.5G a nivel nacional.",
         "antiguedad": "14 meses",
         "region": "Trujillo",
         "lineas_moviles_activas": 1
@@ -106,13 +135,73 @@ CLIENTES_CATALOGO = {
         "recibo_anterior": 79.90,
         "recibo_actual": 90.40,
         "diferencia": 10.50,
+        "tipo_causa": "reconexion_suspension",
         "motivo_principal": "Cargo por reconexión morosa (OC1_RECONEXION)",
         "detalle_variacion": "Cargo por rehabilitación tras suspensión temporal del servicio por pago fuera de fecha.",
+        "beneficios_actuales": "Internet de 100 Mbps y telefonía fija para estar siempre comunicada en tu hogar.",
         "antiguedad": "9 meses",
         "region": "Chiclayo",
         "lineas_moviles_activas": 1
+    },
+    "CLI007": {
+        "id": "CLI007",
+        "nombre": "Pedro Gómez",
+        "servicio": "Plan Fibra 200 Mbps",
+        "plan_actual": "Plan Fibra 200 Mbps",
+        "tipo_servicio": "HOGAR",
+        "telefono_movil": "943210987",
+        "estado_linea_movil": "ACTIVA",
+        "recibo_anterior": 65.00,
+        "recibo_actual": 85.00,
+        "diferencia": 20.00,
+        "tipo_causa": "compra_paquetes",
+        "motivo_principal": "Compra de Paquete Bloque TV HD + 10GB",
+        "detalle_variacion": "Adquisición de paquete complementario de contenido y datos solicitado en el ciclo.",
+        "beneficios_actuales": "200 Mbps de fibra simétrica y acceso a los canales HD contratados en tu Smart TV.",
+        "antiguedad": "11 meses",
+        "region": "Cusco",
+        "lineas_moviles_activas": 1
+    },
+    "CLI008": {
+        "id": "CLI008",
+        "nombre": "Elena Flores",
+        "servicio": "Plan Fibra 500 Mbps",
+        "plan_actual": "Plan Fibra 500 Mbps",
+        "tipo_servicio": "HOGAR",
+        "telefono_movil": "932109876",
+        "estado_linea_movil": "ACTIVA",
+        "recibo_anterior": 95.00,
+        "recibo_actual": 75.00,
+        "diferencia": -20.00,
+        "tipo_causa": "nota_credito",
+        "motivo_principal": "Nota de Crédito por Ajuste de Facturación",
+        "detalle_variacion": "Descuento a favor de S/ 20.00 por regularización de saldo aprobada por reclamo.",
+        "beneficios_actuales": "500 Mbps de máxima velocidad simétrica con tu saldo completamente al día.",
+        "antiguedad": "15 meses",
+        "region": "Piura",
+        "lineas_moviles_activas": 1
+    },
+    "CLI009": {
+        "id": "CLI009",
+        "nombre": "Jorge Salinas",
+        "servicio": "Plan Fibra 1000 Mbps",
+        "plan_actual": "Plan Fibra 1000 Mbps",
+        "tipo_servicio": "HOGAR",
+        "telefono_movil": "921098765",
+        "estado_linea_movil": "ACTIVA",
+        "recibo_anterior": 79.90,
+        "recibo_actual": 109.90,
+        "diferencia": 30.00,
+        "tipo_causa": "cambio_plan",
+        "motivo_principal": "Cambio de Plan a Fibra 1000 Mbps",
+        "detalle_variacion": "Migración voluntaria de Plan Fibra 300 a Fibra 1000 con incremento de velocidad.",
+        "beneficios_actuales": "1000 Mbps de fibra simétrica para navegación ultrarrápida en múltiples dispositivos.",
+        "antiguedad": "20 meses",
+        "region": "Huancayo",
+        "lineas_moviles_activas": 1
     }
 }
+
 
 
 def init_session_state():

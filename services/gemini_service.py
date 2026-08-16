@@ -175,12 +175,14 @@ def get_gemini_response(
     monto_var = var_info.get("monto", client_ctx.get("diferencia", 0.0))
     recibo_ant = float(client_ctx.get("recibo_anterior", 89.90))
     recibo_act = float(client_ctx.get("recibo_actual", 119.90))
+    beneficios_cliente = client_ctx.get("beneficios_actuales", "tu velocidad de fibra simétrica y minutos ilimitados")
 
     of = nbo_data.get("oferta_recomendada", {})
     ben = nbo_data.get("beneficio_economico", {})
     nombre_mt = of.get("nombre_oferta", "Movistar Total Dúo 200 Mbps + 1 Línea")
     precio_mt = float(of.get("precio_promocional", 110.40))
     ahorro_soles = float(ben.get("ahorro_mensual_soles", 29.40))
+    puede_cross_selling = bool(ahorro_soles > 0 and client_ctx.get("tipo_servicio") in ["HOGAR_Y_MOVIL", "HOGAR", "SOLO_HOGAR"])
 
     # Formatear historial
     historial_formateado = []
@@ -190,7 +192,7 @@ def get_gemini_response(
         historial_formateado.append(f"{role_label}: {h.get('content')}")
     historial_str = "\n".join(historial_formateado) if historial_formateado else "Inicio de conversación."
 
-    tiene_intencion_especifica = any(k in msg_clean for k in ["total", "upgrade", "cambiar", "ahorr", "fraccion", "recibo", "subio", "subió", "por qué", "porque", "cobro", "lucas", "menos", "cuanto", "cuánto", "pago", "mas", "más", "vino", "promo", "diferencia"])
+    tiene_intencion_especifica = any(k in msg_clean for k in ["total", "upgrade", "cambiar", "ahorr", "fraccion", "recibo", "subio", "subió", "por qué", "porque", "cobro", "lucas", "menos", "cuanto", "cuánto", "pago", "mas", "más", "vino", "promo", "diferencia", "desglose", "detalle"])
     es_saludo_inicial = len(chat_history) == 0 and not tiene_intencion_especifica and any(msg_clean == s or msg_clean.startswith(s + " ") for s in ["hola", "hi", "hello", "buenas", "oye", "habla", "ey", "buenos dias", "buenas tardes", "buenas noches"])
 
 
@@ -199,10 +201,11 @@ def get_gemini_response(
 
 DATOS REALES DEL CLIENTE (AUDITADOS):
 - Nombre: {nombre_cliente} ({cid})
-- Plan: {client_ctx.get('plan_actual', 'Plan Fibra')}
-- Tarifa regular base: S/ {recibo_ant:.2f}/mes (lo que pagó en junio).
-- Recibo de Julio: S/ {recibo_act:.2f} (incluye un cobro adicional por única vez de +S/ {monto_var:.2f} por '{motivo_var}').
+- Plan actual: {client_ctx.get('plan_actual', 'Plan Fibra')}
+- Tarifa regular base: S/ {recibo_ant:.2f}/mes (facturada en junio).
+- Recibo de Julio: S/ {recibo_act:.2f} (incluye variación de +S/ {monto_var:.2f} por '{motivo_var}').
 - Línea móvil: {client_ctx.get('telefono_movil', '987654321')} ({client_ctx.get('estado_linea_movil', 'ACTIVA')}).
+- Beneficios actuales ya activos: {beneficios_cliente}
 
 HISTORIAL DE CHARLA:
 {historial_str}
@@ -211,11 +214,12 @@ NUEVO MENSAJE DEL CLIENTE:
 "{user_message}"
 
 INSTRUCCIONES CLAVE:
-1. Responde en **MÁXIMO 1 O 2 ORACIONES (20 a 30 palabras)**.
-2. Si el cliente pregunta cuánto paga o por qué subió, explícale que su tarifa base es S/ {recibo_ant:.2f} y que los +S/ {monto_var:.2f} corresponden únicamente a '{motivo_var}' por única vez.
-3. Si el cliente pregunta cuánto paga por internet y cuánto por móvil, aclara que su plan base de hogar/móvil es S/ {recibo_ant:.2f} y el repetidor es S/ {monto_var:.2f}.
-4. Si el cliente pide explícitamente información de Movistar Total o cambio de plan, dale el precio de S/ {precio_mt:.2f} y el ahorro mensual de S/ {ahorro_soles:.2f}. De lo contrario, NO ofrezcas Movistar Total y limítate a responder lo que preguntó.
-
+1. Responde en **MÁXIMO 1 O 2 ORACIONES (20 a 30 palabras)** con un tono humano, horizontal y transparente.
+2. Si el cliente pregunta cuánto paga o por qué subió, explícale con total claridad que su tarifa base es S/ {recibo_ant:.2f} y que los +S/ {monto_var:.2f} corresponden a '{motivo_var}'.
+3. Si el cliente pregunta cuánto paga por internet y cuánto por móvil, aclara que su plan base es S/ {recibo_ant:.2f} y el repetidor/adicional es S/ {monto_var:.2f}.
+4. Si el cliente pide explícitamente información de Movistar Total o cambio de plan, dale el precio de S/ {precio_mt:.2f} y el ahorro mensual de S/ {ahorro_soles:.2f}.
+5. EFECTO EFERVESCENTE: Si el cliente agradece o finaliza ('gracias', 'listo', 'entendido'), despídete recordando con calidez los beneficios que ya tiene en su plan actual ('{beneficios_cliente}'), sin ofrecer adiciones nuevas.
+6. De lo contrario, NO ofrezcas Movistar Total y limítate a resolver exactamente lo que preguntó.
 """
 
     gemini_key = api_key_override or os.environ.get("GEMINI_API_KEY") or config.GEMINI_API_KEY
@@ -227,15 +231,21 @@ INSTRUCCIONES CLAVE:
             msg_lower = user_message.lower()
             action_payload = None
 
-            # Determinar componente visual adjunto (solo cuando sea pertinente)
+            # Determinar componente visual adjunto y acciones recomendadas
             if es_saludo_inicial:
                 action_payload = {"action": "SHOW_DASHBOARD"}
-            elif any(p in msg_lower for p in ["cambiar de plan", "cambiar plan", "quiero ver planes", "promocion total", "movistar total"]):
+            elif any(p in msg_lower for p in ["cambiar de plan", "cambiar plan", "quiero ver planes", "promocion total", "movistar total", "alternativas comerciales"]):
                 action_payload = {"action": "SHOW_UPGRADE_CARD", "nbo": nbo_data}
             elif any(p in msg_lower for p in ["fraccionar", "cuotas", "diferir"]):
                 action_payload = {"action": "SHOW_INSTALLMENT_MODAL", "monto": recibo_act}
-            elif any(p in msg_lower for p in ["por qué", "porque", "subio", "subió", "cobran de mas", "recibo", "desglose", "detalle"]):
-                action_payload = {"action": "SHOW_BILLING_BREAKDOWN", "variacion": var_info}
+            elif any(p in msg_lower for p in ["por qué", "porque", "subio", "subió", "cobran de mas", "recibo", "desglose", "detalle", "cuanto pago", "cuánto pago", "vino mas", "vino más"]):
+                action_payload = {
+                    "action": "SHOW_ACTIONS_HUB",
+                    "variacion": var_info,
+                    "nbo": nbo_data if puede_cross_selling else None,
+                    "puede_cross_selling": puede_cross_selling,
+                    "motivo_var": motivo_var
+                }
 
             return {
                 "response_text": raw_reply,
@@ -257,8 +267,15 @@ INSTRUCCIONES CLAVE:
     elif any(p in msg_low for p in ["cuanto pago", "cuánto pago", "desglose", "detalle"]):
         resp_text = (
             f"Tu plan base es de **S/ {recibo_ant:.2f}/mes**. En julio pagas **S/ {recibo_act:.2f}** "
-            f"porque se sumaron **S/ {monto_var:.2f}** por la {motivo_var.lower()} (cobro por única vez)."
+            f"porque se sumaron **S/ {monto_var:.2f}** por {motivo_var.lower()}."
         )
+        action_payload = {
+            "action": "SHOW_ACTIONS_HUB",
+            "variacion": var_info,
+            "nbo": nbo_data if puede_cross_selling else None,
+            "puede_cross_selling": puede_cross_selling,
+            "motivo_var": motivo_var
+        }
 
     elif any(p in msg_low for p in ["q es eso", "que es eso", "q significa", "que significa"]):
         if "repetidor" in motivo_var.lower():
@@ -266,22 +283,27 @@ INSTRUCCIONES CLAVE:
         elif "reconexión" in motivo_var.lower() or "moros" in motivo_var.lower():
             resp_text = f"Es el cargo único de **S/ {monto_var:.2f}** por reactivar tu línea tras suspensión. No se repetirá si pagas a tiempo."
         else:
-            resp_text = f"Corresponde a un cargo por única vez de **S/ {monto_var:.2f}** por {motivo_var.lower()}."
+            resp_text = f"Corresponde a un cargo de **S/ {monto_var:.2f}** por {motivo_var.lower()}."
 
-    elif any(p in msg_low for p in ["subio", "subió", "por qué", "porque", "cobran de mas", "caro", "mucho"]):
+    elif any(p in msg_low for p in ["subio", "subió", "por qué", "porque", "cobran de mas", "caro", "mucho", "vino mas", "vino más"]):
         resp_text = (
             f"Tranquilo {nombre_cliente}, tu plan normal es de **S/ {recibo_ant:.2f}**. "
-            f"Este mes subió a **S/ {recibo_act:.2f}** por el cobro único de **S/ {monto_var:.2f}** por {motivo_var.lower()}."
+            f"Este mes subió a **S/ {recibo_act:.2f}** por el cobro de **S/ {monto_var:.2f}** por {motivo_var.lower()}."
         )
-        action_payload = {"action": "SHOW_BILLING_BREAKDOWN", "variacion": var_info}
+        action_payload = {
+            "action": "SHOW_ACTIONS_HUB",
+            "variacion": var_info,
+            "nbo": nbo_data if puede_cross_selling else None,
+            "puede_cross_selling": puede_cross_selling,
+            "motivo_var": motivo_var
+        }
 
     elif any(p in msg_low for p in ["gracias", "listo", "entendido", "ok", "vale", "ya entendi"]):
-        resp_text = f"¡De nada, {nombre_cliente}! Recuerda que estamos para ayudarte. ¡Que tengas un excelente día!"
+        resp_text = f"¡Un placer, {nombre_cliente}! Recuerda que tu plan ya incluye {beneficios_cliente} para disfrutar en casa. ¡Que tengas un excelente día!"
 
-    elif any(p in msg_low for p in ["cambiar plan", "cambiar de plan", "movistar total", "unificar", "upgrade", "ahorro"]):
+    elif any(p in msg_low for p in ["cambiar plan", "cambiar de plan", "movistar total", "unificar", "upgrade", "ahorro", "alternativas"]):
         resp_text = f"Puedes migrar a **{nombre_mt}** por solo **S/ {precio_mt:.2f}/mes**, con un ahorro mensual de **S/ {ahorro_soles:.2f}** en tu cuenta."
         action_payload = {"action": "SHOW_UPGRADE_CARD", "nbo": nbo_data}
-
 
     else:
         resp_text = f"Hola {nombre_cliente}, tu plan actual es de **S/ {recibo_ant:.2f}/mes**. ¿Qué detalle deseas revisar?"
@@ -292,3 +314,4 @@ INSTRUCCIONES CLAVE:
         "tool_calls_executed": [{"tool": "consultar_recibo"}],
         "model_used": "Yara-AI-SemanticEngine"
     }
+
