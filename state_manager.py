@@ -255,43 +255,11 @@ def init_session_state():
         st.session_state.chat_history = list(st.session_state.client_chat_memories.get(cur_id, []))
 
     if "escalated_tickets" not in st.session_state:
-        st.session_state.escalated_tickets = [
-            {
-                "ticket_id": "TCK-1001",
-                "client_id": "CLI004",
-                "client_name": "Lucía Ramos",
-                "reason": "Discrepancia en cargo proporcional de prorrateo por cambio de plan.",
-                "chat_history": [
-                    {"role": "user", "content": "¿Por qué mi recibo vino con S/ 25.00 de más?"},
-                    {"role": "assistant", "content": "Se debe al prorrateo de días por la activación de tu plan en medio del ciclo."},
-                    {"role": "user", "content": "Quiero que un asesor revise si aplica nota de crédito."}
-                ],
-                "timestamp": "2026-08-14 00:15:30",
-                "status": "PENDIENTE",
-                "priority": "MEDIA",
-                "assigned_agent": "Sin Asignar",
-                "notes": "Cliente solicita revisión de días facturados en alta."
-            },
-            {
-                "ticket_id": "TCK-1002",
-                "client_id": "CLI006",
-                "client_name": "Ana Castro",
-                "reason": "Solicitud de exoneración de cargo por reconexión morosa.",
-                "chat_history": [
-                    {"role": "user", "content": "Pagué ayer y me cobran reconexión de S/ 10.50."},
-                    {"role": "assistant", "content": "El cargo OC1_RECONEXION corresponde al corte del servicio."},
-                    {"role": "user", "content": "Deseo hablar con un asesor para fraccionar o exonerar."}
-                ],
-                "timestamp": "2026-08-14 00:22:10",
-                "status": "EN_ATENCION",
-                "priority": "ALTA",
-                "assigned_agent": "Carlos Vega (Asesor Senior)",
-                "notes": "En evaluación de fidelización por antigüedad."
-            }
-        ]
+        st.session_state.escalated_tickets = []
 
     if "selected_ticket_id" not in st.session_state:
-        st.session_state.selected_ticket_id = "TCK-1001"
+        st.session_state.selected_ticket_id = None
+
 
     if "selected_solution_tab" not in st.session_state:
         st.session_state.selected_solution_tab = "fraccionamiento"

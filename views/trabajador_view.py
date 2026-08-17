@@ -143,12 +143,12 @@ def render_trabajador_view():
 
     if not tickets:
         st.info("ℹ️ No hay tickets registrados en la cola en este momento.")
-        if st.button("➕ Generar Caso de Prueba para Demostración", key="btn_gen_test_ticket_w", type="primary"):
+        if st.button("➕ Simular Derivación de Roberto Díaz (CLI005)", key="btn_gen_test_ticket_w", type="primary"):
             from state_manager import escalate_case_to_human
             escalate_case_to_human(
-                client_id="CLI004",
-                client_name="Lucía Ramos",
-                reason="Consulta de prorrateo en recibo de alta."
+                client_id="CLI005",
+                client_name="Roberto Díaz",
+                reason="Consulta por cuota de equipo financiado ShEq (Samsung Galaxy)."
             )
             st.rerun()
         return
@@ -232,17 +232,18 @@ def render_trabajador_view():
             return
 
         t_id = t_sel["ticket_id"]
-        cid = t_sel.get("client_id", "CLI004")
+        cid = t_sel.get("client_id", "CLI005")
         cliente_meta = CLIENTES_CATALOGO.get(cid, {
             "id": cid,
-            "nombre": t_sel.get("client_name", "Cliente"),
-            "servicio": "Plan Fibra Óptica + Móvil",
-            "recibo_actual": 119.90,
-            "recibo_anterior": 89.90,
-            "diferencia": 30.00,
-            "motivo_principal": "Ajuste de facturación",
-            "beneficios_actuales": "Internet simétrico y minutos ilimitados"
+            "nombre": t_sel.get("client_name", "Roberto Díaz"),
+            "servicio": "Plan Móvil 65GB Ilimitado",
+            "recibo_actual": 90.90,
+            "recibo_anterior": 55.90,
+            "diferencia": 35.00,
+            "motivo_principal": "Cuota 3/12 de equipo financiado (Samsung Galaxy)",
+            "beneficios_actuales": "65GB de alta velocidad y minutos ilimitados"
         })
+
 
         diff_audit = auditar_variacion_recibo(cid, "2026-07")
         nbo_data = generar_next_best_offer(cid)

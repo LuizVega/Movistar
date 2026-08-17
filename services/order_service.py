@@ -206,8 +206,9 @@ def ejecutar_fraccionamiento_deuda(
     return {
         "exito": True,
         "orden_id": orden_id,
+        "solicitud_id": orden_id,
         "cliente_id": cid,
-        "cliente_nombre": cliente_meta["nombre"],
+        "cliente_nombre": cliente_meta.get("nombre", f"Cliente {cid}"),
         "cuotas": cuotas,
         "monto_cuota": monto_cuota,
         "monto_total": monto_total,
@@ -217,6 +218,7 @@ def ejecutar_fraccionamiento_deuda(
         "estado_orden": "PROCESADA",
         "mensaje_yara": mensaje_yara
     }
+
 
 
 def ejecutar_pago_recibo(

@@ -26,7 +26,7 @@ class TestStateManager(unittest.TestCase):
         self.assertEqual(st.session_state.user_role, "cliente")
         self.assertIsInstance(st.session_state.chat_history, list)
         self.assertIsInstance(st.session_state.escalated_tickets, list)
-        self.assertGreater(len(st.session_state.escalated_tickets), 0)
+
 
 
     def test_escalate_ticket(self):

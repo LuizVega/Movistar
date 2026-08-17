@@ -224,12 +224,30 @@ def render_chat_action_elements(msg: Dict[str, Any], msg_idx: int, client_contex
             with btn_cols[1]:
                 if st.button("💳 Fraccionar", key=f"btn_act_fracc_{msg_idx}", use_container_width=True):
                     st.session_state[action_executed_key] = True
-                    res_fracc = ejecutar_fraccionamiento_deuda(cid, 6, recibo_actual)
-                    add_chat_message(
-                        role="assistant",
-                        content=f"🎉 **Fraccionamiento Aprobado.** Solicitud `{res_fracc['solicitud_id']}` procesada en 6 cuotas de **S/ {res_fracc['monto_cuota']:.2f}/mes** al 0.0% TCEA."
-                    )
+                    is_equipo = (cid == "CLI005" or client_context.get("tipo_causa") == "cuota_equipo")
+                    monto_a_fraccionar = float(client_context.get("recibo_anterior", 55.90)) if is_equipo else recibo_actual
+                    res_fracc = ejecutar_fraccionamiento_deuda(cid, 6, monto_a_fraccionar)
+                    sol_id = res_fracc.get("solicitud_id") or res_fracc.get("orden_id") or "FRACC-001"
+                    m_cuota = res_fracc.get("monto_cuota", round(monto_a_fraccionar / 6, 2))
+
+                    if is_equipo:
+                        c_eq = float(client_context.get("diferencia", 35.00))
+                        add_chat_message(
+                            role="assistant",
+                            content=(
+                                f"🎉 **Fraccionamiento Aprobado.** Solicitud `{sol_id}` procesada con éxito.\n\n"
+                                f"• **Monto Fraccionado:** S/ {monto_a_fraccionar:.2f} *(pago de servicio; tu smartphone Samsung Galaxy continúa en su cuota regular de S/ {c_eq:.2f}/mes)*.\n"
+                                f"• **Plan de Pagos:** 6 cuotas fijas de **S/ {m_cuota:.2f}/mes** al 0.0% TCEA.\n"
+                                f"• **Estado:** Aprobado en Mi Movistar."
+                            )
+                        )
+                    else:
+                        add_chat_message(
+                            role="assistant",
+                            content=f"🎉 **Fraccionamiento Aprobado.** Solicitud `{sol_id}` procesada en 6 cuotas de **S/ {m_cuota:.2f}/mes** al 0.0% TCEA."
+                        )
                     st.rerun()
+
 
             with btn_cols[2]:
                 if st.button("📝 Registrar", key=f"btn_act_reg_{msg_idx}", use_container_width=True):
@@ -399,12 +417,25 @@ def render_chat_action_elements(msg: Dict[str, Any], msg_idx: int, client_contex
 
     # 4. Si la acción recomendada es Fraccionamiento de Deuda
     elif action_type == "SHOW_INSTALLMENT_MODAL":
-        monto_fracc = float(action_payload.get("monto", recibo_actual))
+        is_equipo = (cid == "CLI005" or client_context.get("tipo_causa") == "cuota_equipo")
+        cuota_eq = float(client_context.get("diferencia", 35.00))
+        monto_plan = float(client_context.get("recibo_anterior", 55.90))
+        monto_fracc = monto_plan if is_equipo else float(action_payload.get("monto", recibo_actual))
+        m_cuota = round(monto_fracc / 6, 2)
+
         if not is_executed:
+            if is_equipo:
+                desc_html = (
+                    f"Tu teléfono móvil ya se encuentra financiado en cuotas (cuota 3/12 de S/ {cuota_eq:.2f}). "
+                    f"El fraccionamiento aplicará sobre el pago de tu plan de servicio (**S/ {monto_plan:.2f}**) en 6 cuotas fijas de **S/ {m_cuota:.2f}/mes** al 0.0% TCEA."
+                )
+            else:
+                desc_html = f"¿Deseas diferir tu recibo de S/ {monto_fracc:.2f} en 6 cuotas fijas de S/ {m_cuota:.2f}/mes sin intereses (0.0% TCEA)?"
+
             st.markdown(f"""
             <div style="background: {theme['bg_card']}; border: 1px solid {theme['border']}; border-radius: 16px; padding: 16px 20px; max-width: 520px; margin: 10px 0 10px 48px;">
                 <div style="font-size: 14px; font-weight: 700; color: {theme['highlight']}; margin-bottom: 6px;">💳 Opción de Fraccionamiento al 0.0% TCEA</div>
-                <div style="font-size: 13px; color: {theme['text_secondary']};">¿Deseas diferir tu recibo de S/ {monto_fracc:.2f} en 6 cuotas fijas de S/ {(monto_fracc/6):.2f}/mes sin intereses?</div>
+                <div style="font-size: 13px; color: {theme['text_secondary']}; line-height: 1.45;">{desc_html}</div>
             </div>
             """, unsafe_allow_html=True)
             col_f1, col_f2 = st.columns([1.2, 1.2])
@@ -412,15 +443,28 @@ def render_chat_action_elements(msg: Dict[str, Any], msg_idx: int, client_contex
                 if st.button("✅ Fraccionar en 6 cuotas", key=f"btn_fracc_opt_{msg_idx}", type="primary", use_container_width=True):
                     st.session_state[action_executed_key] = True
                     res_fracc = ejecutar_fraccionamiento_deuda(cid, 6, monto_fracc)
-                    add_chat_message(
-                        role="assistant",
-                        content=f"🎉 **Fraccionamiento Aprobado.** Tu solicitud `{res_fracc['solicitud_id']}` fue procesada en 6 cuotas de **S/ {res_fracc['monto_cuota']:.2f}/mes**."
-                    )
+                    sol_id = res_fracc.get("solicitud_id") or res_fracc.get("orden_id") or "FRACC-001"
+                    if is_equipo:
+                        add_chat_message(
+                            role="assistant",
+                            content=(
+                                f"🎉 **Fraccionamiento Aprobado.** Solicitud `{sol_id}` procesada con éxito.\n\n"
+                                f"• **Monto Fraccionado:** S/ {monto_fracc:.2f} *(pago de servicio; tu smartphone continúa en su cuota de S/ {cuota_eq:.2f}/mes)*.\n"
+                                f"• **Plan de Pagos:** 6 cuotas fijas de **S/ {res_fracc.get('monto_cuota', m_cuota):.2f}/mes** al 0.0% TCEA.\n"
+                                f"• **Estado:** Aprobado en Mi Movistar."
+                            )
+                        )
+                    else:
+                        add_chat_message(
+                            role="assistant",
+                            content=f"🎉 **Fraccionamiento Aprobado.** Tu solicitud `{sol_id}` fue procesada en 6 cuotas de **S/ {res_fracc.get('monto_cuota', m_cuota):.2f}/mes** al 0.0% TCEA."
+                        )
                     st.rerun()
             with col_f2:
                 if st.button("❌ No por ahora", key=f"btn_no_fracc_{msg_idx}", use_container_width=True):
                     st.session_state[action_executed_key] = True
                     st.rerun()
+
 
     # 5. Botones individuales recomendados
     elif action_payload.get("show_action_buttons"):

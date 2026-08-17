@@ -264,13 +264,12 @@ INSTRUCCIONES CLAVE:
 2. Si el cliente pregunta cuánto paga o por qué subió su recibo, explícale que su tarifa base es S/ {recibo_ant:.2f} y que los +S/ {monto_var:.2f} corresponden a '{motivo_var}'.
 3. Si el cliente pide hablar con un asesor o alguien superior ('asesor', 'humano', 'alguien superior', 'persona'), indícale con calidez que puedes conectarlo de inmediato con un asesor humano.
 4. Si el cliente dice que quiere pagar, indícale el monto exacto (S/ {recibo_act:.2f}) y que puede pulsar el botón de pago seguro.
-5. Si el cliente dice que quiere fraccionar o pagar en cuotas, dile que puede diferir su recibo sin intereses a continuación.
+5. Si el cliente tiene un equipo ya financiado (como Roberto Díaz) y pregunta por fraccionar o qué opciones tiene, explícale que su equipo/teléfono ya está financiado en cuotas mensuales y que el fraccionamiento aplicará sobre el pago de su plan de servicio (S/ {recibo_ant:.2f}) en cuotas fijas sin intereses.
 6. Si el cliente pregunta por Movistar Total, promociones o cuánto puede ahorrar, dale el precio de S/ {precio_mt:.2f}/mes y el ahorro mensual exacto de S/ {ahorro_soles:.2f} con '{nombre_mt}'.
-7. Si el cliente pregunta qué puede hacer ahora o qué opciones tiene, explícale brevemente que puede pagar, fraccionar, registrar su consulta o pedir atención con un asesor.
+7. Si el cliente pregunta qué puede hacer ahora o qué opciones tiene, explícale brevemente que puede pagar, fraccionar su plan, registrar su consulta o pedir atención con un asesor.
 8. EFECTO EFERVESCENTE: Si el cliente agradece o finaliza ('gracias', 'listo', 'entendido'), despídete recordando los beneficios de su plan actual ('{beneficios_cliente}'), sin ofrecer nada adicional.
 9. De lo contrario, NO ofrezcas Movistar Total y limítate a resolver lo que preguntó.
 """
-
 
     gemini_key = api_key_override or os.environ.get("GEMINI_API_KEY") or config.GEMINI_API_KEY
     if gemini_key and len(gemini_key) > 10:
@@ -294,7 +293,8 @@ INSTRUCCIONES CLAVE:
             elif is_pay_query:
                 action_payload = {"action": "SHOW_PAY_BUTTON", "monto": recibo_act}
             elif is_installment_query:
-                action_payload = {"action": "SHOW_INSTALLMENT_MODAL", "monto": recibo_act}
+                monto_inst = recibo_ant if (cid == "CLI005" or "equipo" in motivo_var.lower()) else recibo_act
+                action_payload = {"action": "SHOW_INSTALLMENT_MODAL", "monto": monto_inst}
             elif is_register_query:
                 action_payload = {"action": "SHOW_REGISTER_BUTTON"}
             elif is_upgrade_query:
@@ -321,10 +321,16 @@ INSTRUCCIONES CLAVE:
         action_payload = {"action": "SHOW_DASHBOARD"}
 
     elif is_options_hub_query:
-        resp_text = (
-            f"Tienes disponibles estas opciones para tu cuenta: realizar el pago directo (S/ {recibo_act:.2f}), solicitar un fraccionamiento en cuotas sin intereses, "
-            f"registrar una consulta formal o comunicarte con un asesor."
-        )
+        if cid == "CLI005" or "equipo" in motivo_var.lower():
+            resp_text = (
+                f"Roberto, como tu teléfono ya se encuentra financiado en cuotas mensuales, tienes la opción de fraccionar el pago de tu plan (S/ {recibo_ant:.2f}) sin intereses, "
+                f"pagar el total de tu recibo (S/ {recibo_act:.2f}), registrar tu consulta formal o comunicarte con un asesor."
+            )
+        else:
+            resp_text = (
+                f"Tienes disponibles estas opciones para tu cuenta: realizar el pago directo (S/ {recibo_act:.2f}), solicitar un fraccionamiento en cuotas sin intereses, "
+                f"registrar una consulta formal o comunicarte con un asesor."
+            )
         action_payload = {
             "action": "SHOW_ACTIONS_HUB",
             "variacion": var_info,
@@ -342,8 +348,16 @@ INSTRUCCIONES CLAVE:
         action_payload = {"action": "SHOW_PAY_BUTTON", "monto": recibo_act}
 
     elif is_installment_query:
-        resp_text = f"Puedes diferir tu recibo de **S/ {recibo_act:.2f}** en hasta 6 cuotas fijas sin intereses."
-        action_payload = {"action": "SHOW_INSTALLMENT_MODAL", "monto": recibo_act}
+        if cid == "CLI005" or "equipo" in motivo_var.lower():
+            resp_text = (
+                f"Roberto, tu teléfono celular ya se encuentra financiado en cuotas mensuales (cuota 3/12 de S/ {monto_var:.2f}). "
+                f"Por ello, el fraccionamiento aplicará sobre el pago de tu plan de servicio (S/ {recibo_ant:.2f}) en 6 cuotas sin intereses de S/ {(recibo_ant/6):.2f}/mes."
+            )
+            action_payload = {"action": "SHOW_INSTALLMENT_MODAL", "monto": recibo_ant}
+        else:
+            resp_text = f"Puedes diferir tu recibo de **S/ {recibo_act:.2f}** en hasta 6 cuotas fijas sin intereses."
+            action_payload = {"action": "SHOW_INSTALLMENT_MODAL", "monto": recibo_act}
+
 
     elif is_register_query:
         resp_text = f"Puedo generar tu constancia de consulta formal para seguimiento en Mi Movistar."
