@@ -74,8 +74,9 @@ class TestGeminiService(unittest.TestCase):
             client_context=client_ctx
         )
         
-        self.assertIn("TCK-", res["response_text"])
-        self.assertEqual(res["action_payload"]["action"], "TRIGGER_ESCALATION")
+        self.assertTrue("asesor" in res["response_text"].lower() or "TCK-" in res["response_text"])
+        self.assertIn(res["action_payload"]["action"], ["TRIGGER_ESCALATION", "SHOW_ADVISOR_BUTTON"])
+
 
     def test_efecto_efervescente(self):
         """Valida que al agradecer/finalizar la conversación, la IA recuerde los beneficios activos del plan."""

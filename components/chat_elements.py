@@ -189,8 +189,12 @@ def render_chat_action_elements(msg: Dict[str, Any], msg_idx: int, client_contex
     if action_type == "SHOW_DASHBOARD":
         render_client_dashboard_card(client_context)
 
-    # 2. Si la acción recomendada es mostrar el Desglose de Facturación o el Hub de Acciones
-    elif action_type in ["SHOW_BILLING_BREAKDOWN", "SHOW_ACTIONS_HUB"]:
+    # 2. Explicación de Desglose de Facturación (Sin botones de acción)
+    elif action_type == "SHOW_BILLING_BREAKDOWN":
+        render_bento_billing_card(client_context)
+
+    # 3. Hub Completo de Siguientes Acciones (Solo cuando el usuario pregunta qué puede hacer / qué opciones tiene)
+    elif action_type == "SHOW_ACTIONS_HUB":
         render_bento_billing_card(client_context)
 
         if not is_executed:
@@ -205,7 +209,6 @@ def render_chat_action_elements(msg: Dict[str, Any], msg_idx: int, client_contex
             nbo_data = action_payload.get("nbo")
             puede_cs = action_payload.get("puede_cross_selling", False)
 
-            # Botonera interactiva de 4 o 5 columnas
             btn_cols = st.columns(5 if puede_cs else 4)
 
             with btn_cols[0]:
@@ -276,9 +279,68 @@ def render_chat_action_elements(msg: Dict[str, Any], msg_idx: int, client_contex
             </div>
             """, unsafe_allow_html=True)
 
+    # 4. Botón Único de Asesor Humano (Solo cuando el usuario pide hablar con asesor / alguien superior)
+    elif action_type in ["SHOW_ADVISOR_BUTTON", "TRIGGER_ESCALATION"]:
+        if not is_executed:
+            st.markdown("<div style='margin: 8px 0 10px 48px; max-width: 420px;'>", unsafe_allow_html=True)
+            if st.button("👨‍💼 Conectar con Asesor Humano", key=f"btn_single_adv_{msg_idx}", type="primary", use_container_width=True):
+                st.session_state[action_executed_key] = True
+                ticket = escalar_a_humano(cid, st.session_state.get("chat_history", []), f"Solicitud explícita de atención personalizada ({client_context.get('motivo_principal', '')})")
+                add_chat_message(
+                    role="assistant",
+                    content=f"🔔 **He transferido tu caso a un asesor senior.** Ticket CRM: **`{ticket['ticket_id']}`** con todo el historial y detalle auditado."
+                )
+                st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div style="margin: 4px 0 10px 48px; font-size: 12px; color: #16a34a; font-weight: 700;">
+                ✅ Caso derivado a un asesor senior en el CRM.
+            </div>
+            """, unsafe_allow_html=True)
 
+    # 5. Botón Único de Pago Directo (Solo cuando el usuario dice que quiere pagar)
+    elif action_type == "SHOW_PAY_BUTTON":
+        if not is_executed:
+            st.markdown("<div style='margin: 8px 0 10px 48px; max-width: 420px;'>", unsafe_allow_html=True)
+            if st.button(f"💳 Pagar Recibo (S/ {recibo_actual:.2f})", key=f"btn_single_pay_{msg_idx}", type="primary", use_container_width=True):
+                st.session_state[action_executed_key] = True
+                res_pago = ejecutar_pago_recibo(cid, recibo_actual)
+                add_chat_message(
+                    role="assistant",
+                    content=f"✅ **Pago Registrado.** Comprobante `{res_pago['transaccion_id']}` por **S/ {res_pago['monto_pagado']:.2f}** vía Pasarela Digital Movistar. Tu recibo está al día."
+                )
+                st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div style="margin: 4px 0 10px 48px; font-size: 12px; color: #16a34a; font-weight: 700;">
+                ✅ Pago registrado exitosamente en tu cuenta.
+            </div>
+            """, unsafe_allow_html=True)
 
-    # 3. Si la acción recomendada es Propuesta de Movistar Total
+    # 6. Botón Único de Registrar Consulta (Solo cuando el usuario pide registrar reclamo / consulta)
+    elif action_type == "SHOW_REGISTER_BUTTON":
+        if not is_executed:
+            st.markdown("<div style='margin: 8px 0 10px 48px; max-width: 420px;'>", unsafe_allow_html=True)
+            if st.button("📝 Registrar Consulta Formal", key=f"btn_single_reg_{msg_idx}", type="primary", use_container_width=True):
+                st.session_state[action_executed_key] = True
+                motivo = client_context.get("motivo_principal", "Consulta de Recibo")
+                res_cns = ejecutar_registro_consulta(cid, motivo=motivo, resumen=msg.get("content", ""))
+                add_chat_message(
+                    role="assistant",
+                    content=f"📝 **Consulta Registrada.** Tu código de gestión es **`{res_cns['consulta_id']}`** para seguimiento en Mi Movistar."
+                )
+                st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div style="margin: 4px 0 10px 48px; font-size: 12px; color: #16a34a; font-weight: 700;">
+                ✅ Consulta registrada exitosamente en Mi Movistar.
+            </div>
+            """, unsafe_allow_html=True)
+
+    # 7. Si la acción recomendada es Propuesta de Movistar Total (Solo cuando el usuario pregunta por planes / Movistar Total)
     elif action_type in ["SHOW_UPGRADE_CARD", "UPGRADE_MOVISTAR_TOTAL"]:
         nbo_data = action_payload.get("nbo") or generar_next_best_offer(cid)
         of = nbo_data.get("oferta_recomendada", {})
@@ -309,61 +371,31 @@ def render_chat_action_elements(msg: Dict[str, Any], msg_idx: int, client_contex
         """, unsafe_allow_html=True)
 
         if not is_executed:
-            col_b1, col_b2, col_b3, col_b4 = st.columns([1.2, 1.1, 1.0, 1.1])
-
-            with col_b1:
-                if st.button("🚀 Cambiar de Plan", key=f"btn_confirm_mt_{msg_idx}", type="primary", use_container_width=True):
-                    st.session_state[action_executed_key] = True
-                    resultado_orden = ejecutar_upgrade_plan(
-                        cliente_id=cid,
-                        nuevo_plan_id=of.get("oferta_id", 10),
-                        canal="YARA_AI"
-                    )
-                    st.balloons()
-                    add_chat_message(
-                        role="assistant",
-                        content=(
-                            f"🎉 **¡Excelente! Cambio a Movistar Total registrado.**\n\n"
-                            f"• **Código de Orden:** `{resultado_orden['orden_id']}`\n"
-                            f"• **Nuevo Plan:** **{resultado_orden['nuevo_plan']}**\n"
-                            f"• **Nueva Tarifa:** `S/ {resultado_orden['precio_nuevo']:.2f}/mes`\n"
-                            f"• **Vigencia:** `{resultado_orden['fecha_vigencia']}`."
-                        ),
-                        metadata={"type": "CONFIRMACION_UPGRADE", "orden": resultado_orden}
-                    )
-                    st.rerun()
-
-            with col_b2:
-                if st.button("💳 Fraccionar", key=f"btn_fracc_quick_{msg_idx}", use_container_width=True):
-                    st.session_state[action_executed_key] = True
-                    res_fracc = ejecutar_fraccionamiento_deuda(cid, 6, recibo_actual)
-                    add_chat_message(
-                        role="assistant",
-                        content=f"🎉 **Fraccionamiento Aprobado.** Tu solicitud `{res_fracc['solicitud_id']}` fue procesada en 6 cuotas de **S/ {res_fracc['monto_cuota']:.2f}/mes al 0.0% de interés**."
-                    )
-                    st.rerun()
-
-            with col_b3:
-                if st.button("💳 Pagar", key=f"btn_pay_quick_{msg_idx}", use_container_width=True):
-                    st.session_state[action_executed_key] = True
-                    res_pago = ejecutar_pago_recibo(cid, recibo_actual)
-                    add_chat_message(
-                        role="assistant",
-                        content=f"✅ **Pago Registrado.** Transacción `{res_pago['transaccion_id']}` por **S/ {res_pago['monto_pagado']:.2f}**. Tu recibo de julio está al día."
-                    )
-                    st.rerun()
-
-            with col_b4:
-                if st.button("👨‍💼 Asesor", key=f"btn_advisor_quick_{msg_idx}", use_container_width=True):
-                    st.session_state[action_executed_key] = True
-                    ticket = escalar_a_humano(cid, st.session_state.get("chat_history", []), "Cliente solicita atención personalizada de asesor")
-                    add_chat_message(
-                        role="assistant",
-                        content=f"🔔 **He derivado tu caso a un asesor senior.** Ticket CRM: **`{ticket['ticket_id']}`**."
-                    )
-                    st.rerun()
+            st.markdown("<div style='margin: 8px 0 10px 48px; max-width: 420px;'>", unsafe_allow_html=True)
+            if st.button("🚀 Cambiar a Movistar Total", key=f"btn_confirm_mt_{msg_idx}", type="primary", use_container_width=True):
+                st.session_state[action_executed_key] = True
+                resultado_orden = ejecutar_upgrade_plan(
+                    cliente_id=cid,
+                    nuevo_plan_id=of.get("oferta_id", 10),
+                    canal="YARA_AI"
+                )
+                st.balloons()
+                add_chat_message(
+                    role="assistant",
+                    content=(
+                        f"🎉 **¡Excelente! Cambio a Movistar Total registrado.**\n\n"
+                        f"• **Código de Orden:** `{resultado_orden['orden_id']}`\n"
+                        f"• **Nuevo Plan:** **{resultado_orden['nuevo_plan']}**\n"
+                        f"• **Nueva Tarifa:** `S/ {resultado_orden['precio_nuevo']:.2f}/mes`\n"
+                        f"• **Vigencia:** `{resultado_orden['fecha_vigencia']}`."
+                    ),
+                    metadata={"type": "CONFIRMACION_UPGRADE", "orden": resultado_orden}
+                )
+                st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
         else:
             st.caption("✅ *Gestión registrada exitosamente.*")
+
 
     # 4. Si la acción recomendada es Fraccionamiento de Deuda
     elif action_type == "SHOW_INSTALLMENT_MODAL":

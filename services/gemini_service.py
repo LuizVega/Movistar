@@ -192,9 +192,55 @@ def get_gemini_response(
         historial_formateado.append(f"{role_label}: {h.get('content')}")
     historial_str = "\n".join(historial_formateado) if historial_formateado else "Inicio de conversación."
 
-    tiene_intencion_especifica = any(k in msg_clean for k in ["total", "upgrade", "cambiar", "ahorr", "fraccion", "recibo", "subio", "subió", "por qué", "porque", "cobro", "lucas", "menos", "cuanto", "cuánto", "pago", "mas", "más", "vino", "promo", "diferencia", "desglose", "detalle"])
-    es_saludo_inicial = len(chat_history) == 0 and not tiene_intencion_especifica and any(msg_clean == s or msg_clean.startswith(s + " ") for s in ["hola", "hi", "hello", "buenas", "oye", "habla", "ey", "buenos dias", "buenas tardes", "buenas noches"])
+    # 1. Normalización y filtros de intención
+    msg_clean = user_message.lower().strip()
 
+    # Detección de intenciones específicas:
+    is_advisor_query = any(k in msg_clean for k in [
+        "asesor", "humano", "alguien superior", "superior", "supervisor", "persona", "agente", "representante",
+        "hablar con alguien", "pasame con alguien", "pásame con alguien", "comunicame con alguien", "comunícame con alguien",
+        "atencion humana", "atención humana", "operador", "alguien mas", "alguien más", "otro asesor",
+        "hablar con un asesor", "comunicarme con un asesor", "pasame con un asesor", "pásame con un asesor",
+        "transferir con un asesor", "quiero un humano", "libro de reclamaciones"
+    ])
+
+    is_options_hub_query = any(k in msg_clean for k in [
+        "que puedo hacer", "qué puedo hacer", "que puedo hacer ahora", "qué puedo hacer ahora",
+        "que opciones", "qué opciones", "cuales son mis opciones", "cuáles son mis opciones",
+        "como soluciono", "cómo soluciono", "que hago ahora", "qué hago ahora", "que hago", "qué hago",
+        "que me recomiendas hacer", "qué me recomiendas hacer", "que alternativas tengo", "qué alternativas tengo",
+        "no puedo pagar todo"
+    ])
+
+    is_pay_query = any(k in msg_clean for k in [
+        "pagar", "quiero pagar", "como pago", "cómo pago", "donde pago", "dónde pago",
+        "cancelar recibo", "pago rapido", "pago rápido", "hacer el pago", "pagar recibo", "pagar ahora"
+    ]) and not is_options_hub_query
+
+    is_installment_query = any(k in msg_clean for k in [
+        "fraccionar", "fraccionamiento", "cuotas", "pagar por partes", "pagar en partes",
+        "diferir", "financiar", "financiamiento", "en cuotas", "por cuotas"
+    ]) and not is_options_hub_query
+
+    is_register_query = any(k in msg_clean for k in [
+        "registrar consulta", "registrar reclamo", "registrar queja", "poner reclamo", "dejar constancia",
+        "reclamo formal", "abrir ticket", "registrar mi caso", "registrar mi consulta"
+    ]) and not is_options_hub_query
+
+    is_upgrade_query = any(k in msg_clean for k in [
+        "cambiar de plan", "cambiar plan", "quiero ver planes", "promocion total", "promoción total",
+        "movistar total", "como puedo ahorrar", "cómo puedo ahorrar", "cuanto puedo ahorrar", "cuánto puedo ahorrar",
+        "alternativas comerciales", "mejorar plan", "upgrade", "ahorro", "ahorrar", "planes"
+    ]) and not is_options_hub_query
+
+    is_billing_breakdown_query = any(k in msg_clean for k in [
+        "por qué", "porque", "subio", "subió", "aumento", "cobran", "cobro", "recibo", "desglose", "detalle",
+        "cuanto", "cuánto", "vino", "caro", "mucho", "plata", "lucas", "mangos", "diferencia",
+        "prorrateo", "equipo", "reconexion", "reconexión", "descuento", "q es", "que es"
+    ]) and not is_options_hub_query and not is_advisor_query and not is_pay_query and not is_installment_query and not is_register_query and not is_upgrade_query
+
+    tiene_intencion_especifica = is_advisor_query or is_options_hub_query or is_pay_query or is_installment_query or is_register_query or is_upgrade_query or is_billing_breakdown_query
+    es_saludo_inicial = len(chat_history) == 0 and not tiene_intencion_especifica and any(msg_clean == s or msg_clean.startswith(s + " ") for s in ["hola", "hi", "hello", "buenas", "oye", "habla", "ey", "buenos dias", "buenas tardes", "buenas noches"])
 
     prompt_gemini = f"""
 {YARA_SYSTEM_PROMPT}
@@ -215,12 +261,14 @@ NUEVO MENSAJE DEL CLIENTE:
 
 INSTRUCCIONES CLAVE:
 1. Responde en **MÁXIMO 1 O 2 ORACIONES (20 a 30 palabras)** con un tono humano, horizontal y transparente.
-2. Si el cliente pregunta cuánto paga o por qué subió, explícale con total claridad que su tarifa base es S/ {recibo_ant:.2f} y que los +S/ {monto_var:.2f} corresponden a '{motivo_var}'.
-3. Si el cliente pregunta cuánto paga por internet y cuánto por móvil, aclara que su plan base es S/ {recibo_ant:.2f} y el repetidor/adicional es S/ {monto_var:.2f}.
-4. Si el cliente pregunta qué puede hacer, qué opciones tiene o cómo solucionarlo, indícale amablemente que puede pagar su recibo, solicitar un fraccionamiento en cuotas, registrar una consulta formal o pedir atención con un asesor.
-5. Si el cliente pide explícitamente información de Movistar Total o cambio de plan, dale el precio de S/ {precio_mt:.2f} y el ahorro mensual de S/ {ahorro_soles:.2f}.
-6. EFECTO EFERVESCENTE: Si el cliente agradece o finaliza ('gracias', 'listo', 'entendido'), despídete recordando con calidez los beneficios que ya tiene en su plan actual ('{beneficios_cliente}'), sin ofrecer adiciones nuevas.
-7. De lo contrario, NO ofrezcas Movistar Total y limítate a resolver exactamente lo que preguntó.
+2. Si el cliente pregunta cuánto paga o por qué subió su recibo, explícale que su tarifa base es S/ {recibo_ant:.2f} y que los +S/ {monto_var:.2f} corresponden a '{motivo_var}'.
+3. Si el cliente pide hablar con un asesor o alguien superior ('asesor', 'humano', 'alguien superior', 'persona'), indícale con calidez que puedes conectarlo de inmediato con un asesor humano.
+4. Si el cliente dice que quiere pagar, indícale el monto exacto (S/ {recibo_act:.2f}) y que puede pulsar el botón de pago seguro.
+5. Si el cliente dice que quiere fraccionar o pagar en cuotas, dile que puede diferir su recibo sin intereses a continuación.
+6. Si el cliente pregunta por Movistar Total, promociones o cuánto puede ahorrar, dale el precio de S/ {precio_mt:.2f}/mes y el ahorro mensual exacto de S/ {ahorro_soles:.2f} con '{nombre_mt}'.
+7. Si el cliente pregunta qué puede hacer ahora o qué opciones tiene, explícale brevemente que puede pagar, fraccionar, registrar su consulta o pedir atención con un asesor.
+8. EFECTO EFERVESCENTE: Si el cliente agradece o finaliza ('gracias', 'listo', 'entendido'), despídete recordando los beneficios de su plan actual ('{beneficios_cliente}'), sin ofrecer nada adicional.
+9. De lo contrario, NO ofrezcas Movistar Total y limítate a resolver lo que preguntó.
 """
 
 
@@ -229,25 +277,11 @@ INSTRUCCIONES CLAVE:
         raw_reply = _call_gemini_rest(prompt_gemini, gemini_key, "gemini-flash-lite-latest")
 
         if raw_reply:
-            resp_lower = raw_reply.lower()
-            msg_lower = user_message.lower()
             action_payload = None
-
-            # Determinar componente visual adjunto y acciones recomendadas
-            is_billing_query = any(p in msg_lower for p in [
-                "por qué", "porque", "subio", "subió", "aumento", "cobran", "cobro", "recibo", "desglose", "detalle",
-                "cuanto", "cuánto", "pago", "pagar", "vino", "caro", "mucho", "plata", "lucas", "mangos", "diferencia",
-                "prorrateo", "equipo", "reconexion", "reconexión", "descuento", "plan", "que puedo hacer", "qué puedo hacer",
-                "que opciones", "qué opciones", "como soluciono", "cómo soluciono", "alternativas", "ayuda", "q es", "que es"
-            ])
 
             if es_saludo_inicial:
                 action_payload = {"action": "SHOW_DASHBOARD"}
-            elif any(p in msg_lower for p in ["cambiar de plan", "cambiar plan", "quiero ver planes", "promocion total", "movistar total"]):
-                action_payload = {"action": "SHOW_UPGRADE_CARD", "nbo": nbo_data}
-            elif any(p in msg_lower for p in ["fraccionar", "cuotas", "diferir"]):
-                action_payload = {"action": "SHOW_INSTALLMENT_MODAL", "monto": recibo_act}
-            elif is_billing_query or not any(k in msg_lower for k in ["gracias", "chau", "adios", "hasta luego", "presidente", "luna"]):
+            elif is_options_hub_query:
                 action_payload = {
                     "action": "SHOW_ACTIONS_HUB",
                     "variacion": var_info,
@@ -255,6 +289,18 @@ INSTRUCCIONES CLAVE:
                     "puede_cross_selling": puede_cross_selling,
                     "motivo_var": motivo_var
                 }
+            elif is_advisor_query:
+                action_payload = {"action": "SHOW_ADVISOR_BUTTON"}
+            elif is_pay_query:
+                action_payload = {"action": "SHOW_PAY_BUTTON", "monto": recibo_act}
+            elif is_installment_query:
+                action_payload = {"action": "SHOW_INSTALLMENT_MODAL", "monto": recibo_act}
+            elif is_register_query:
+                action_payload = {"action": "SHOW_REGISTER_BUTTON"}
+            elif is_upgrade_query:
+                action_payload = {"action": "SHOW_UPGRADE_CARD", "nbo": nbo_data}
+            elif is_billing_breakdown_query:
+                action_payload = {"action": "SHOW_BILLING_BREAKDOWN"}
 
             return {
                 "response_text": raw_reply,
@@ -274,10 +320,10 @@ INSTRUCCIONES CLAVE:
         resp_text = f"¡Hola {nombre_cliente}! Dime en qué te puedo apoyar hoy con tu servicio de Movistar."
         action_payload = {"action": "SHOW_DASHBOARD"}
 
-    elif any(p in msg_low for p in ["que puedo hacer", "qué puedo hacer", "que opciones tengo", "qué opciones tengo", "como soluciono", "cómo soluciono", "opciones", "no puedo pagar todo"]):
+    elif is_options_hub_query:
         resp_text = (
-            f"Puedes realizar el pago directo de tu recibo (S/ {recibo_act:.2f}), solicitar un fraccionamiento en cuotas sin intereses, "
-            f"registrar una consulta de revisión técnica o comunicarte con un asesor."
+            f"Tienes disponibles estas opciones para tu cuenta: realizar el pago directo (S/ {recibo_act:.2f}), solicitar un fraccionamiento en cuotas sin intereses, "
+            f"registrar una consulta formal o comunicarte con un asesor."
         )
         action_payload = {
             "action": "SHOW_ACTIONS_HUB",
@@ -287,50 +333,46 @@ INSTRUCCIONES CLAVE:
             "motivo_var": motivo_var
         }
 
-    elif any(p in msg_low for p in ["cuanto pago", "cuánto pago", "desglose", "detalle"]):
-        resp_text = (
-            f"Tu plan base es de **S/ {recibo_ant:.2f}/mes**. En julio pagas **S/ {recibo_act:.2f}** "
-            f"porque se sumaron **S/ {monto_var:.2f}** por {motivo_var.lower()}."
-        )
-        action_payload = {
-            "action": "SHOW_ACTIONS_HUB",
-            "variacion": var_info,
-            "nbo": nbo_data if puede_cross_selling else None,
-            "puede_cross_selling": puede_cross_selling,
-            "motivo_var": motivo_var
-        }
+    elif is_advisor_query:
+        resp_text = f"Entendido {nombre_cliente}. Pulsa el botón a continuación si deseas que te comunique de inmediato con un asesor senior."
+        action_payload = {"action": "SHOW_ADVISOR_BUTTON"}
 
-    elif any(p in msg_low for p in ["q es eso", "que es eso", "q significa", "que significa"]):
-        if "repetidor" in motivo_var.lower():
-            resp_text = f"Es el cobro único de **S/ {monto_var:.2f}** por la instalación de tu repetidor WiFi. El próximo mes tu recibo vuelve a **S/ {recibo_ant:.2f}**."
-        elif "reconexión" in motivo_var.lower() or "moros" in motivo_var.lower():
-            resp_text = f"Es el cargo único de **S/ {monto_var:.2f}** por reactivar tu línea tras suspensión. No se repetirá si pagas a tiempo."
-        else:
-            resp_text = f"Corresponde a un cargo de **S/ {monto_var:.2f}** por {motivo_var.lower()}."
+    elif is_pay_query:
+        resp_text = f"Puedes realizar el pago de tu recibo de **S/ {recibo_act:.2f}** directamente a través de nuestra pasarela digital segura aquí:"
+        action_payload = {"action": "SHOW_PAY_BUTTON", "monto": recibo_act}
 
-    elif any(p in msg_low for p in ["subio", "subió", "por qué", "porque", "cobran de mas", "caro", "mucho", "vino mas", "vino más"]):
-        resp_text = (
-            f"Tranquilo {nombre_cliente}, tu plan normal es de **S/ {recibo_ant:.2f}**. "
-            f"Este mes subió a **S/ {recibo_act:.2f}** por el cobro de **S/ {monto_var:.2f}** por {motivo_var.lower()}."
-        )
-        action_payload = {
-            "action": "SHOW_ACTIONS_HUB",
-            "variacion": var_info,
-            "nbo": nbo_data if puede_cross_selling else None,
-            "puede_cross_selling": puede_cross_selling,
-            "motivo_var": motivo_var
-        }
+    elif is_installment_query:
+        resp_text = f"Puedes diferir tu recibo de **S/ {recibo_act:.2f}** en hasta 6 cuotas fijas sin intereses."
+        action_payload = {"action": "SHOW_INSTALLMENT_MODAL", "monto": recibo_act}
 
-    elif any(p in msg_low for p in ["gracias", "listo", "entendido", "ok", "vale", "ya entendi"]):
-        resp_text = f"¡Un placer, {nombre_cliente}! Recuerda que tu plan ya incluye {beneficios_cliente} para disfrutar en casa. ¡Que tengas un excelente día!"
+    elif is_register_query:
+        resp_text = f"Puedo generar tu constancia de consulta formal para seguimiento en Mi Movistar."
+        action_payload = {"action": "SHOW_REGISTER_BUTTON"}
 
-    elif any(p in msg_low for p in ["cambiar plan", "cambiar de plan", "movistar total", "unificar", "upgrade", "ahorro"]):
+    elif is_upgrade_query:
         resp_text = f"Puedes migrar a **{nombre_mt}** por solo **S/ {precio_mt:.2f}/mes**, con un ahorro mensual de **S/ {ahorro_soles:.2f}** en tu cuenta."
         action_payload = {"action": "SHOW_UPGRADE_CARD", "nbo": nbo_data}
 
-    else:
-        resp_text = f"Hola {nombre_cliente}, tu plan actual es de **S/ {recibo_ant:.2f}/mes**. ¿Qué detalle deseas revisar?"
+    elif is_billing_breakdown_query:
+        if "repetidor" in motivo_var.lower():
+            resp_text = f"Tu plan base es de **S/ {recibo_ant:.2f}**. Este mes subió a **S/ {recibo_act:.2f}** por el cobro único de instalación de tu repetidor WiFi (**+S/ {monto_var:.2f}**)."
+        elif "reconexión" in motivo_var.lower() or "moros" in motivo_var.lower():
+            resp_text = f"Tu tarifa base es de **S/ {recibo_ant:.2f}**. Se agregaron **S/ {monto_var:.2f}** por reconexión tras suspensión temporal."
+        elif "prorrateo" in motivo_var.lower() or "alta" in motivo_var.lower() or "ciclo" in motivo_var.lower():
+            resp_text = f"Tu plan contratado es de **S/ {recibo_ant:.2f}**. Tu primer recibo es de **S/ {recibo_act:.2f}** debido al prorrateo de días proporcionales (**+S/ {monto_var:.2f}**). El próximo mes pagas S/ {recibo_ant:.2f}."
+        elif "equipo" in motivo_var.lower() or "sheq" in motivo_var.lower():
+            resp_text = f"Tu plan móvil base es de **S/ {recibo_ant:.2f}**. Se sumaron **S/ {monto_var:.2f}** correspondientes a la cuota mensual de tu equipo financiado."
+        else:
+            resp_text = f"Tu plan base es de **S/ {recibo_ant:.2f}**. Este mes pagas **S/ {recibo_act:.2f}** debido a un cargo de **+S/ {monto_var:.2f}** por {motivo_var.lower()}."
+        action_payload = {"action": "SHOW_BILLING_BREAKDOWN"}
 
+    elif any(p in msg_low for p in ["gracias", "listo", "entendido", "ok", "vale", "ya entendi"]):
+        resp_text = f"¡Un placer, {nombre_cliente}! Recuerda que tu plan ya incluye {beneficios_cliente} para disfrutar en casa. ¡Que tengas un excelente día!"
+        action_payload = None
+
+    else:
+        resp_text = f"Hola {nombre_cliente}, tu plan actual es de **S/ {recibo_ant:.2f}/mes**. ¿Deseas revisar algún detalle de tu facturación o servicio?"
+        action_payload = None
 
     return {
         "response_text": resp_text,
@@ -338,4 +380,5 @@ INSTRUCCIONES CLAVE:
         "tool_calls_executed": [{"tool": "consultar_recibo"}],
         "model_used": "Yara-AI-SemanticEngine"
     }
+
 
