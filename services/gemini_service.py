@@ -234,13 +234,20 @@ INSTRUCCIONES CLAVE:
             action_payload = None
 
             # Determinar componente visual adjunto y acciones recomendadas
+            is_billing_query = any(p in msg_lower for p in [
+                "por qué", "porque", "subio", "subió", "aumento", "cobran", "cobro", "recibo", "desglose", "detalle",
+                "cuanto", "cuánto", "pago", "pagar", "vino", "caro", "mucho", "plata", "lucas", "mangos", "diferencia",
+                "prorrateo", "equipo", "reconexion", "reconexión", "descuento", "plan", "que puedo hacer", "qué puedo hacer",
+                "que opciones", "qué opciones", "como soluciono", "cómo soluciono", "alternativas", "ayuda", "q es", "que es"
+            ])
+
             if es_saludo_inicial:
                 action_payload = {"action": "SHOW_DASHBOARD"}
-            elif any(p in msg_lower for p in ["cambiar de plan", "cambiar plan", "quiero ver planes", "promocion total", "movistar total", "alternativas comerciales"]):
+            elif any(p in msg_lower for p in ["cambiar de plan", "cambiar plan", "quiero ver planes", "promocion total", "movistar total"]):
                 action_payload = {"action": "SHOW_UPGRADE_CARD", "nbo": nbo_data}
             elif any(p in msg_lower for p in ["fraccionar", "cuotas", "diferir"]):
                 action_payload = {"action": "SHOW_INSTALLMENT_MODAL", "monto": recibo_act}
-            elif any(p in msg_lower for p in ["por qué", "porque", "subio", "subió", "cobran de mas", "recibo", "desglose", "detalle", "cuanto pago", "cuánto pago", "vino mas", "vino más", "que puedo hacer", "qué puedo hacer", "que opciones tengo", "qué opciones tengo", "como soluciono", "cómo soluciono", "alternativas"]):
+            elif is_billing_query or not any(k in msg_lower for k in ["gracias", "chau", "adios", "hasta luego", "presidente", "luna"]):
                 action_payload = {
                     "action": "SHOW_ACTIONS_HUB",
                     "variacion": var_info,
@@ -255,6 +262,7 @@ INSTRUCCIONES CLAVE:
                 "tool_calls_executed": [{"tool": "consultar_recibo"}],
                 "model_used": "Google Gemini (gemini-flash-lite-latest)"
             }
+
 
     # =========================================================
     # 4. MOTOR SEMÁNTICO LOCAL DE RESPALDO (EN CASO DE CORTE DE API)

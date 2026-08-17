@@ -195,16 +195,20 @@ def render_chat_action_elements(msg: Dict[str, Any], msg_idx: int, client_contex
 
         if not is_executed:
             st.markdown(f"""
-            <div style="margin: 6px 0 8px 48px; font-size: 12px; font-weight: 600; color: {theme['text_secondary']};">
-                ⚡ Siguientes acciones recomendadas:
+            <div style="background: {theme['bg_card_header']}; border: 1px solid {theme['border']}; border-radius: 14px; padding: 10px 16px; margin: 8px 0 10px 48px; max-width: 520px;">
+                <div style="font-size: 13px; font-weight: 700; color: {theme['highlight']}; display: flex; align-items: center; gap: 6px;">
+                    <span>⚡</span> Opciones de gestión para tu recibo:
+                </div>
             </div>
             """, unsafe_allow_html=True)
 
             nbo_data = action_payload.get("nbo")
             puede_cs = action_payload.get("puede_cross_selling", False)
 
-            col_a1, col_a2, col_a3, col_a4 = st.columns([1.1, 1.3, 1.2, 1.1])
-            with col_a1:
+            # Botonera interactiva de 4 o 5 columnas
+            btn_cols = st.columns(5 if puede_cs else 4)
+
+            with btn_cols[0]:
                 if st.button("💳 Pagar", key=f"btn_act_pay_{msg_idx}", type="primary", use_container_width=True):
                     st.session_state[action_executed_key] = True
                     res_pago = ejecutar_pago_recibo(cid, recibo_actual)
@@ -213,8 +217,19 @@ def render_chat_action_elements(msg: Dict[str, Any], msg_idx: int, client_contex
                         content=f"✅ **Pago Registrado.** Comprobante `{res_pago['transaccion_id']}` por **S/ {res_pago['monto_pagado']:.2f}** vía Pasarela Digital Movistar. Tu recibo está al día."
                     )
                     st.rerun()
-            with col_a2:
-                if st.button("📝 Registrar Consulta", key=f"btn_act_reg_{msg_idx}", use_container_width=True):
+
+            with btn_cols[1]:
+                if st.button("💳 Fraccionar", key=f"btn_act_fracc_{msg_idx}", use_container_width=True):
+                    st.session_state[action_executed_key] = True
+                    res_fracc = ejecutar_fraccionamiento_deuda(cid, 6, recibo_actual)
+                    add_chat_message(
+                        role="assistant",
+                        content=f"🎉 **Fraccionamiento Aprobado.** Solicitud `{res_fracc['solicitud_id']}` procesada en 6 cuotas de **S/ {res_fracc['monto_cuota']:.2f}/mes** al 0.0% TCEA."
+                    )
+                    st.rerun()
+
+            with btn_cols[2]:
+                if st.button("📝 Registrar", key=f"btn_act_reg_{msg_idx}", use_container_width=True):
                     st.session_state[action_executed_key] = True
                     motivo = client_context.get("motivo_principal", "Consulta de Recibo")
                     res_cns = ejecutar_registro_consulta(cid, motivo=motivo, resumen=msg.get("content", ""))
@@ -223,9 +238,10 @@ def render_chat_action_elements(msg: Dict[str, Any], msg_idx: int, client_contex
                         content=f"📝 **Consulta Registrada.** Tu código de gestión es **`{res_cns['consulta_id']}`** para seguimiento en Mi Movistar."
                     )
                     st.rerun()
-            with col_a3:
-                if puede_cs:
-                    if st.button("⭐ Alternativas", key=f"btn_act_cs_{msg_idx}", use_container_width=True):
+
+            if puede_cs:
+                with btn_cols[3]:
+                    if st.button("⭐ Ahorro MT", key=f"btn_act_cs_{msg_idx}", use_container_width=True):
                         st.session_state[action_executed_key] = True
                         nbo = nbo_data or generar_next_best_offer(cid)
                         add_chat_message(
@@ -234,24 +250,32 @@ def render_chat_action_elements(msg: Dict[str, Any], msg_idx: int, client_contex
                             metadata={"action_payload": {"action": "SHOW_UPGRADE_CARD", "nbo": nbo}}
                         )
                         st.rerun()
-                else:
-                    if st.button("💳 Fraccionar", key=f"btn_act_fracc_{msg_idx}", use_container_width=True):
+                with btn_cols[4]:
+                    if st.button("👨‍💼 Asesor", key=f"btn_act_adv_{msg_idx}", use_container_width=True):
                         st.session_state[action_executed_key] = True
-                        res_fracc = ejecutar_fraccionamiento_deuda(cid, 6, recibo_actual)
+                        ticket = escalar_a_humano(cid, st.session_state.get("chat_history", []), f"Derivación desde consulta de recibo ({client_context.get('motivo_principal', '')})")
                         add_chat_message(
                             role="assistant",
-                            content=f"🎉 **Fraccionamiento Aprobado.** Solicitud `{res_fracc['solicitud_id']}` procesada en 6 cuotas de **S/ {res_fracc['monto_cuota']:.2f}/mes** al 0% TCEA."
+                            content=f"🔔 **He derivado tu caso a un asesor senior.** Ticket CRM: **`{ticket['ticket_id']}`** con todo el historial y detalle auditado."
                         )
                         st.rerun()
-            with col_a4:
-                if st.button("👨‍💼 Asesor", key=f"btn_act_adv_{msg_idx}", use_container_width=True):
-                    st.session_state[action_executed_key] = True
-                    ticket = escalar_a_humano(cid, st.session_state.get("chat_history", []), f"Derivación desde consulta de recibo ({client_context.get('motivo_principal', '')})")
-                    add_chat_message(
-                        role="assistant",
-                        content=f"🔔 **He derivado tu caso a un asesor senior.** Ticket CRM: **`{ticket['ticket_id']}`** con todo el historial y detalle auditado."
-                    )
-                    st.rerun()
+            else:
+                with btn_cols[3]:
+                    if st.button("👨‍💼 Asesor", key=f"btn_act_adv_{msg_idx}", use_container_width=True):
+                        st.session_state[action_executed_key] = True
+                        ticket = escalar_a_humano(cid, st.session_state.get("chat_history", []), f"Derivación desde consulta de recibo ({client_context.get('motivo_principal', '')})")
+                        add_chat_message(
+                            role="assistant",
+                            content=f"🔔 **He derivado tu caso a un asesor senior.** Ticket CRM: **`{ticket['ticket_id']}`** con todo el historial y detalle auditado."
+                        )
+                        st.rerun()
+        else:
+            st.markdown(f"""
+            <div style="margin: 4px 0 10px 48px; font-size: 12px; color: #16a34a; font-weight: 700;">
+                ✅ Gestión registrada exitosamente en tu cuenta.
+            </div>
+            """, unsafe_allow_html=True)
+
 
 
     # 3. Si la acción recomendada es Propuesta de Movistar Total
